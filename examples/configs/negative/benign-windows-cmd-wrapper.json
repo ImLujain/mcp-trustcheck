@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "sqlite": {
+      "command": "cmd",
+      "args": ["/c", "npx", "-y", "mcp-sqlite@1.2.3", "C:\\Users\\alice\\Projects\\app\\dev.db"]
+    }
+  }
+}

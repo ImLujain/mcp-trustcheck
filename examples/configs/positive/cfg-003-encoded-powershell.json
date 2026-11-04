@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "win-helper": {
+      "command": "powershell.exe",
+      "args": ["-NoProfile", "-EncodedCommand", "bgBwAHgAIABoAGUAbABwAGUAcgAtAG0AYwBwAA=="]
+    }
+  }
+}

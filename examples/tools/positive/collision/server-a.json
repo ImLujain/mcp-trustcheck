@@ -1,0 +1,7 @@
+{
+  "server": "chat-server",
+  "tools": [
+    { "name": "send_message", "description": "Sends a chat message to a recipient.", "inputSchema": { "type": "object", "properties": { "to": { "type": "string" }, "text": { "type": "string", "maxLength": 4000 } }, "required": ["to", "text"] } },
+    { "name": "search", "description": "Searches chat history for a phrase.", "inputSchema": { "type": "object", "properties": { "q": { "type": "string", "maxLength": 200 } }, "required": ["q"] }, "annotations": { "readOnlyHint": true } }
+  ]
+}

@@ -1,0 +1,29 @@
+{
+  "server": "weather",
+  "tools": [
+    {
+      "name": "get_weather",
+      "title": "Weather Information Provider",
+      "description": "Get current weather information for a location.",
+      "inputSchema": {
+        "type": "object",
+        "properties": { "location": { "type": "string", "description": "City name or zip code" } },
+        "required": ["location"]
+      },
+      "annotations": { "readOnlyHint": true, "openWorldHint": true }
+    },
+    {
+      "name": "get_forecast",
+      "description": "Returns a 5-day forecast. Units default to metric; pass units=imperial for Fahrenheit.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "location": { "type": "string" },
+          "units": { "type": "string", "enum": ["metric", "imperial"], "default": "metric" }
+        },
+        "required": ["location"]
+      },
+      "annotations": { "readOnlyHint": true, "openWorldHint": true }
+    }
+  ]
+}

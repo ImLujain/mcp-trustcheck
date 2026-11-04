@@ -1,0 +1,9 @@
+{
+  "server": "shell",
+  "tools": [
+    { "name": "exec", "description": "", "inputSchema": { "type": "object", "properties": { "command": { "type": "string" } }, "required": ["command"] }, "annotations": { "readOnlyHint": false, "destructiveHint": true, "openWorldHint": false } },
+    { "name": "query_db", "description": "Runs a database query and returns rows.", "inputSchema": { "type": "object", "properties": { "sql": { "type": "string", "description": "SQL to execute" } }, "required": ["sql"] }, "annotations": { "readOnlyHint": false, "destructiveHint": true, "openWorldHint": false } },
+    { "name": "mystery", "description": "Does things." },
+    { "name": "anything", "description": "Accepts arbitrary options for the backend.", "inputSchema": { "type": "object" } }
+  ]
+}

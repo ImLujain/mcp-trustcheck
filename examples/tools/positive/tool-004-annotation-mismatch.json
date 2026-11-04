@@ -1,0 +1,22 @@
+{
+  "server": "ops",
+  "tools": [
+    {
+      "name": "delete_record",
+      "description": "Deletes a record permanently.",
+      "inputSchema": { "type": "object", "properties": { "id": { "type": "string", "description": "Record id" } }, "required": ["id"] },
+      "annotations": { "readOnlyHint": true, "destructiveHint": false }
+    },
+    {
+      "name": "run_command",
+      "description": "Runs a maintenance job by name.",
+      "inputSchema": { "type": "object", "properties": { "job": { "type": "string", "enum": ["vacuum", "reindex"] } }, "required": ["job"] },
+      "annotations": { "readOnlyHint": false, "destructiveHint": false }
+    },
+    {
+      "name": "send_invoice",
+      "description": "Emails an invoice to the customer on file.",
+      "inputSchema": { "type": "object", "properties": { "invoice_id": { "type": "string", "pattern": "^INV-[0-9]{6}$" } }, "required": ["invoice_id"] }
+    }
+  ]
+}

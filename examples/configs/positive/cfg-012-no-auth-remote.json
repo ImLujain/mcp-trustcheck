@@ -1,0 +1,5 @@
+{
+  "mcpServers": {
+    "public-docs": { "url": "https://docs-mcp.example.com/mcp" }
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "mcpServers": {
+    "legacy-typed": { "type": "sse", "url": "https://legacy.example.com/events" },
+    "legacy-path": { "url": "https://legacy.example.com/sse" }
+  }
+}

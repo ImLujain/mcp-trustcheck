@@ -1,0 +1,7 @@
+{
+  "mcpServers": {
+    "priv": { "command": "docker", "args": ["run", "-i", "--rm", "--privileged", "example.invalid/mcp:1.0"] },
+    "sock": { "command": "docker", "args": ["run", "-i", "--rm", "-v", "/var/run/docker.sock:/var/run/docker.sock", "example.invalid/mcp:1.0"] },
+    "hostns": { "command": "podman", "args": ["run", "-i", "--network=host", "--pid", "host", "--cap-add", "SYS_ADMIN", "--security-opt", "seccomp=unconfined", "-u", "0", "example.invalid/mcp:1.0"] }
+  }
+}

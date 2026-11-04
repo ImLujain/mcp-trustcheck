@@ -1,0 +1,7 @@
+{
+  "server": "calendar",
+  "tools": [
+    { "name": "calendar_list_events", "description": "Lists events in a date range.", "inputSchema": { "type": "object", "properties": { "from": { "type": "string", "format": "date" }, "to": { "type": "string", "format": "date" } }, "required": ["from", "to"] }, "annotations": { "readOnlyHint": true, "openWorldHint": false } },
+    { "name": "calendar_create_event", "description": "Creates an event.", "inputSchema": { "type": "object", "properties": { "title": { "type": "string", "maxLength": 200 }, "start": { "type": "string", "format": "date-time" } }, "required": ["title", "start"] }, "annotations": { "readOnlyHint": false, "destructiveHint": false, "idempotentHint": false, "openWorldHint": false } }
+  ]
+}

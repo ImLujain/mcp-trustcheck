@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "npx-latest": { "command": "npx", "args": ["-y", "@example/weather-mcp"] },
+    "npx-range": { "command": "npx", "args": ["-y", "weather-mcp@^2.0.0"] },
+    "npx-tag": { "command": "npx", "args": ["-y", "-p", "weather-mcp@latest", "weather-mcp"] },
+    "uvx-bare": { "command": "uvx", "args": ["mcp-server-time"] },
+    "uvx-from-range": { "command": "uvx", "args": ["--from", "mcp-server-time>=1.0", "mcp-server-time"] },
+    "git-no-sha": { "command": "npx", "args": ["-y", "github:example/weather-mcp"] }
+  }
+}

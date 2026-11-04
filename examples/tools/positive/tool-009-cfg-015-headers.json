@@ -1,0 +1,83 @@
+{
+  "server": "spanner",
+  "tools": [
+    {
+      "name": "execute_sql",
+      "description": "Executes SQL on the configured database in the chosen region.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "region": {
+            "type": "string",
+            "description": "Region to route to",
+            "x-mcp-header": "Region"
+          },
+          "api_token": {
+            "type": "string",
+            "description": "Caller's API token",
+            "x-mcp-header": "Api-Token"
+          },
+          "customer_email": {
+            "type": "string",
+            "description": "Customer e-mail for audit",
+            "x-mcp-header": "Customer"
+          },
+          "query": {
+            "type": "string",
+            "description": "SQL text",
+            "maxLength": 10000
+          }
+        },
+        "required": [
+          "region",
+          "query"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true,
+        "openWorldHint": false
+      }
+    },
+    {
+      "name": "batch_query",
+      "description": "Returns several query results with per-item routing hints.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "tenant": {
+            "type": "string",
+            "x-mcp-header": "Tenant"
+          },
+          "Tenant2": {
+            "type": "string",
+            "x-mcp-header": "tenant"
+          },
+          "ratio": {
+            "type": "number",
+            "x-mcp-header": "Ratio"
+          },
+          "bad name": {
+            "type": "string",
+            "x-mcp-header": "Bad Name"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "shard": {
+                  "type": "string",
+                  "x-mcp-header": "Shard"
+                }
+              }
+            }
+          }
+        }
+      },
+      "annotations": {
+        "readOnlyHint": true
+      }
+    }
+  ]
+}

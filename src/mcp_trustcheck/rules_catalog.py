@@ -1,0 +1,619 @@
+"""Single source of truth for rule metadata (threat-model.md §6).
+
+Only rules that are actually implemented appear here; the `rules` command, the checks and the
+README tables all read from this module so they cannot drift apart.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+
+from mcp_trustcheck.model import Confidence, Kind, Reference, Severity
+
+SPEC = "https://modelcontextprotocol.io/specification/2026-07-28"
+BEST_PRACTICES = (
+    "https://modelcontextprotocol.io/docs/2026-07-28/tutorials/security/security_best_practices"
+)
+
+REF_LOCAL_COMPROMISE = Reference(
+    "MCP Security Best Practices — Local MCP Server Compromise",
+    f"{BEST_PRACTICES}#local-mcp-server-compromise",
+)
+REF_TOKEN_PASSTHROUGH = Reference(
+    "MCP Security Best Practices — Token Passthrough", f"{BEST_PRACTICES}#token-passthrough"
+)
+REF_SCOPE_MIN = Reference(
+    "MCP Security Best Practices — Scope Minimization", f"{BEST_PRACTICES}#scope-minimization"
+)
+REF_STREAMABLE_HTTP = Reference(
+    "MCP Streamable HTTP transport — Security & Endpoint",
+    f"{SPEC}/basic/transports/streamable-http#security--endpoint",
+)
+REF_AUTHZ = Reference("MCP Authorization specification", f"{SPEC}/basic/authorization")
+REF_TOOLS = Reference("MCP Tools specification", f"{SPEC}/server/tools")
+REF_TOOLS_UI = Reference(
+    "MCP Tools specification — User Interaction Model",
+    f"{SPEC}/server/tools#user-interaction-model",
+)
+REF_INVARIANT = Reference(
+    "Invariant Labs — MCP Security Notification: Tool Poisoning Attacks",
+    "https://invariantlabs.ai/blog/mcp-security-notification",
+)
+REF_CSA = Reference(
+    "Cloud Security Alliance — MCP Tool Poisoning and Rug Pull Attacks (2026)",
+    "https://labs.cloudsecurityalliance.org/research-rb/csa-whitepaper-mcp-security-tool-poisoning-20260506-csa-styl/",
+)
+REF_OWASP_MCP03 = Reference(
+    "OWASP MCP Top 10 (beta) — MCP03 Tool Poisoning",
+    "https://owasp.org/www-project-mcp-top-10/",
+)
+REF_OWASP_SECRETS = Reference(
+    "OWASP Secrets Management Cheat Sheet",
+    "https://cheatsheetseries.owasp.org/cheatsheets/Secrets_Management_Cheat_Sheet.html",
+)
+REF_OAUTH21 = Reference(
+    "OAuth 2.1 — TLS requirements (§1.5)",
+    "https://datatracker.ietf.org/doc/html/draft-ietf-oauth-v2-1-13#section-1.5",
+)
+
+
+@dataclass(frozen=True)
+class RuleMeta:
+    id: str
+    title: str
+    threat: str  # T-id from threat-model.md §3
+    property: str  # the security property evaluated
+    kind: Kind
+    severity: Severity  # default; checks may raise or lower with a stated reason
+    confidence: Confidence  # default
+    impact: str
+    mitigation: str
+    limitations: str
+    references: tuple[Reference, ...] = field(default_factory=tuple)
+    spec_note: str | None = None
+    detection: str = ""  # human-readable summary of the detection logic
+
+
+RULES: dict[str, RuleMeta] = {}
+
+
+def _add(rule: RuleMeta) -> None:
+    RULES[rule.id] = rule
+
+
+_add(
+    RuleMeta(
+        id="CFG-003",
+        title="Shell-mediated server execution",
+        threat="T6",
+        property="The command that launches a local server is a direct executable invocation whose "
+        "arguments cannot be re-interpreted by a shell.",
+        kind=Kind.WEAKNESS,
+        severity=Severity.HIGH,
+        confidence=Confidence.HIGH,
+        impact="A shell wrapper lets a config entry chain arbitrary commands (download-and-execute, "
+        "data exfiltration, destructive operations) that run with the MCP client's privileges, "
+        "and makes the real command harder for a reviewer to see.",
+        mitigation='Launch the server executable directly (`command: "npx"`, args as a list). '
+        "If a shell is unavoidable (e.g. Windows `cmd /c` for a `.cmd` shim), keep the payload a "
+        "single plain command with no metacharacters, and review it in full before approving.",
+        limitations="Cannot see inside wrapper scripts (`bash run.sh`); such entries are reported at "
+        "reduced severity. Metacharacters in the argv of a non-shell command are reported as Info "
+        "because most clients spawn without a shell, but a client that does use one would make them "
+        "live.",
+        references=(REF_LOCAL_COMPROMISE,),
+        detection="`command` basename is a shell; `-c`/`/c`/`-Command`/`-EncodedCommand` present; "
+        "payload inspected for `&&`, `;`, `|`, `$(`, backticks, redirections.",
+    )
+)
+
+_add(
+    RuleMeta(
+        id="CFG-005",
+        title="Hardcoded credential in configuration",
+        threat="T9",
+        property="Credentials are supplied at runtime (environment or client secret store), not stored "
+        "as plaintext in a configuration file.",
+        kind=Kind.WEAKNESS,
+        severity=Severity.HIGH,
+        confidence=Confidence.HIGH,
+        impact="Anyone who can read the file — other local users, backup/sync tools, a repository the "
+        "file is committed to, or any process running as the user — obtains the credential. Config "
+        "files are routinely shared in bug reports and screenshots.",
+        mitigation="Reference the secret instead of embedding it (`${env:NAME}`, VS Code `inputs`, "
+        "or the client's credential store). Rotate any credential that has been written to disk in "
+        "plaintext.",
+        limitations="Known-prefix matches are reliable; key-name and entropy matches are heuristics "
+        "and may flag opaque identifiers that are not secrets. Low-entropy passwords without a "
+        "recognisable key name are missed.",
+        references=(REF_OWASP_SECRETS, REF_TOKEN_PASSTHROUGH),
+        detection="Literal `env`, `headers`, URL userinfo/query and argv values matched against known "
+        "token prefixes (high confidence), then secret-like key names (medium), then high-entropy "
+        "strings (low). `${...}` references and placeholders are excluded. Output is always "
+        "redacted.",
+    )
+)
+
+_add(
+    RuleMeta(
+        id="CFG-006",
+        title="Over-broad filesystem access",
+        threat="T5",
+        property="A filesystem-capable server is restricted to the directories the task actually needs.",
+        kind=Kind.WEAKNESS,
+        severity=Severity.MEDIUM,
+        confidence=Confidence.MEDIUM,
+        impact="Any prompt injection or poisoned tool that reaches this server can read or modify "
+        "everything under the exposed root: SSH keys, cloud credentials, browser profiles, other "
+        "projects. Exposing `/` or the home directory removes the only boundary the server has.",
+        mitigation="Pass only the specific project directories the server needs. Prefer several narrow "
+        "roots over one broad one. For Docker-based servers, mount specific paths read-only where "
+        "possible.",
+        limitations="Only recognises filesystem servers by well-known package names, directory-style "
+        "flags, environment variables, and Docker volume mounts. A server that exposes paths through an "
+        "unrecognised mechanism is missed. Windows paths are matched as strings, not resolved.",
+        references=(REF_LOCAL_COMPROMISE, REF_SCOPE_MIN),
+        detection="Collect directory arguments; flag filesystem roots and drive roots (High), home "
+        "directories and system directories (Medium), and credential directories such as `~/.ssh` "
+        "or `~/.aws` (High).",
+    )
+)
+
+_add(
+    RuleMeta(
+        id="CFG-009",
+        title="Plaintext transport to a remote MCP server",
+        threat="T10",
+        property="Remote MCP traffic — and any bearer credential it carries — is protected by TLS.",
+        kind=Kind.WEAKNESS,
+        severity=Severity.MEDIUM,
+        confidence=Confidence.HIGH,
+        impact="Tool calls, results and any `Authorization` header cross the network in the clear and "
+        "can be read or modified by anyone on the path. With a bearer token present the token itself "
+        "is exposed.",
+        mitigation="Use `https://` (or `wss://`). For local development use a loopback address, which "
+        "the OAuth 2.1 and MCP specifications treat as the only acceptable plaintext exception.",
+        limitations="Cannot know whether the network path is already protected (VPN, service mesh, SSH "
+        "tunnel). Private-range hosts are reported with a note to that effect.",
+        references=(REF_STREAMABLE_HTTP, REF_OAUTH21, REF_AUTHZ),
+        spec_note="Loopback exception per OAuth 2.1 §1.5 and MCP Security Best Practices (SSRF "
+        "section: 'Reject http:// URLs except for loopback addresses').",
+        detection="`url` scheme is `http` or `ws` and host is not loopback. Severity raised to High "
+        "when an Authorization-style header or credential-bearing URL is present.",
+    )
+)
+
+_add(
+    RuleMeta(
+        id="CFG-013",
+        title="Tool approval bypassed (auto-approve / trust)",
+        threat="T11",
+        property="A human can see and deny each tool invocation (MCP Tools spec: there SHOULD always be "
+        "a human in the loop).",
+        kind=Kind.WEAKNESS,
+        severity=Severity.MEDIUM,
+        confidence=Confidence.HIGH,
+        impact="Removes the consent step that limits tool poisoning, rug pulls and indirect prompt "
+        "injection. Published measurements of poisoning success are highest when tool calls are "
+        "auto-approved. A wildcard means every present *and future* tool runs unprompted.",
+        mitigation="Remove wildcard approvals. Auto-approve only specific read-only tools you have "
+        "reviewed, and re-review when the server updates.",
+        limitations="Approval keys are client-specific (`autoApprove`, `alwaysAllow`, `trust`); other "
+        "clients configure approval outside the server entry and are not visible here.",
+        references=(REF_TOOLS_UI, REF_INVARIANT),
+        detection="Server entry contains `autoApprove`/`alwaysAllow` with entries, or `trust: true`. "
+        "Wildcard (`*`, `true`) raises severity to High.",
+    )
+)
+
+_add(
+    RuleMeta(
+        id="TOOL-001",
+        title="Agent-directed instructions in tool metadata",
+        threat="T1",
+        property="Tool metadata describes behaviour to the model; it does not instruct the model, "
+        "reference unrelated files or other tools, or ask for concealment from the user.",
+        kind=Kind.INDICATOR,
+        severity=Severity.MEDIUM,
+        confidence=Confidence.LOW,
+        impact="Tool descriptions and schemas are delivered into the model's context verbatim. "
+        "Embedded instructions can redirect the agent to read secrets, pass them as hidden "
+        "arguments, alter calls to other tools, or hide activity from the user (tool poisoning).",
+        mitigation="Treat the server as untrusted until a human has read every string in its tool "
+        "definitions. Prefer clients that display full descriptions, pin approved definitions "
+        "(see TOOL-006), and keep sensitive-capability servers in separate sessions.",
+        limitations="This is a lexical indicator, not a verdict: legitimate documentation can use "
+        "imperative language, and a determined attacker can paraphrase or write in another "
+        "language. Static analysis cannot determine whether a tool is malicious.",
+        references=(REF_INVARIANT, REF_OWASP_MCP03, REF_CSA, REF_TOOLS),
+        detection="All strings in description, title, parameter descriptions, enum/default values and "
+        "output schema are matched against six signal classes: model-directed imperatives, "
+        "concealment from the user, pseudo system tags, sensitive file references, exfiltration "
+        "channels, and cross-tool manipulation. Confidence scales with the number of distinct classes.",
+    )
+)
+
+_add(
+    RuleMeta(
+        id="TOOL-006",
+        title="Tool definition changed since approved baseline",
+        threat="T2",
+        property="The tool definitions in use are the ones a human reviewed and approved.",
+        kind=Kind.WEAKNESS,
+        severity=Severity.HIGH,
+        confidence=Confidence.HIGH,
+        impact="A server can change a description, schema or annotations after approval (a 'rug pull'); "
+        "the protocol explicitly allows the tool set to change over time. Instructions added later "
+        "reach the model without a new consent step.",
+        mitigation="Re-review every changed and added tool before continuing to use the server; "
+        "update the baseline only after review. Consider clients that pin tool definitions by hash.",
+        limitations="Any legitimate update also triggers this finding — that is the intended behaviour. "
+        "Comparison is offline between two snapshots; it does not observe live changes.",
+        references=(REF_INVARIANT, REF_CSA, REF_TOOLS),
+        spec_note="MCP 2026-07-28 Tools spec: the tool set 'MAY change over time'; clients subscribed "
+        "via subscriptions/listen receive notifications/tools/list_changed.",
+        detection="SHA-256 over the canonical JSON of {name,title,description,inputSchema,outputSchema,"
+        "annotations} per tool; added, removed and changed tools are reported with a field-level diff.",
+    )
+)
+
+
+REF_OWASP_MCP05 = Reference(
+    "OWASP MCP Top 10 (beta) — MCP05 Command Injection & Execution",
+    "https://owasp.org/www-project-mcp-top-10/2025/MCP05-2025%E2%80%93Command-Injection&Execution.html",
+)
+REF_TOOLS_XHEADER = Reference(
+    "MCP Tools specification — x-mcp-header", f"{SPEC}/server/tools#x-mcp-header"
+)
+REF_TOOLS_NAMES = Reference(
+    "MCP Tools specification — Tool Names", f"{SPEC}/server/tools#tool-names"
+)
+REF_TOOLS_SECURITY = Reference(
+    "MCP Tools specification — Security Considerations",
+    f"{SPEC}/server/tools#security-considerations",
+)
+REF_DEPRECATED = Reference("MCP deprecated features registry", f"{SPEC}/deprecated")
+REF_CYBERARK = Reference(
+    "CyberArk Labs — Poison everywhere: no output from your MCP server is safe (2025)",
+    "https://www.cyberark.com/resources/threat-research-blog/poison-everywhere-no-output-from-your-mcp-server-is-safe",
+)
+
+_add(
+    RuleMeta(
+        id="CFG-001",
+        title="Unpinned package executed at launch",
+        threat="T6",
+        property="The code that runs as an MCP server is a known, reviewed version.",
+        kind=Kind.WEAKNESS,
+        severity=Severity.MEDIUM,
+        confidence=Confidence.MEDIUM,
+        impact="`npx`/`uvx`-style launchers resolve the package at every start. Without a pinned version, "
+        "a compromised or typosquatted release is executed with the client's privileges the next "
+        "time the server starts — a supply-chain path that needs no user interaction.",
+        mitigation="Pin an exact version (`pkg@1.2.3`, `pkg==1.2.3`, a git commit SHA) and update "
+        "deliberately. Prefer installing the server once and launching the installed binary.",
+        limitations="Pinning limits drift; it does not vouch for the pinned version. Lockfiles outside "
+        "the config file are not consulted. Only well-known launchers are recognised.",
+        references=(REF_LOCAL_COMPROMISE, REF_CSA),
+        detection="`command` is npx/bunx/pnpm dlx/uvx/pipx run; the package argument has no exact "
+        "version (no `@x.y.z`/`==x.y.z`, or a range/tag such as `latest`, `^`, `>=`).",
+    )
+)
+_add(
+    RuleMeta(
+        id="CFG-002",
+        title="Unexpected executable or inline interpreter code",
+        threat="T6",
+        property="The server executable is a stable, reviewable program, not a transient file or an inline script.",
+        kind=Kind.INDICATOR,
+        severity=Severity.MEDIUM,
+        confidence=Confidence.MEDIUM,
+        impact="A binary in a temp, download or cache directory can be replaced without notice; inline "
+        "code (`python -c`, `node -e`) hides the server's logic inside the config entry where it is "
+        "rarely reviewed.",
+        mitigation="Install servers to a stable location and reference the installed path or launcher; "
+        "move inline code into a versioned file.",
+        limitations="Directory conventions are platform-specific heuristics; a legitimate development "
+        "setup may run from these locations.",
+        references=(REF_LOCAL_COMPROMISE,),
+        detection="Command path under /tmp, /var/tmp, Downloads, Temp, or cache dirs; or an interpreter "
+        "invoked with `-c`/`-e`/`--eval` and an inline program.",
+    )
+)
+_add(
+    RuleMeta(
+        id="CFG-004",
+        title="Dangerous command content",
+        threat="T6",
+        property="A server launch command does not escalate privilege, destroy data, download-and-execute, "
+        "or touch credential stores (patterns the MCP spec tells clients to highlight).",
+        kind=Kind.WEAKNESS,
+        severity=Severity.HIGH,
+        confidence=Confidence.HIGH,
+        impact="These idioms are the payloads of the attack the specification describes: a config entry "
+        "that exfiltrates keys, installs persistence, or wipes files when the client starts the server.",
+        mitigation="Remove the pattern. A legitimate server never needs `sudo`, `rm -rf`, piping a "
+        "download into a shell, or reading `~/.ssh` from its launch command.",
+        limitations="Pattern-based; a maintenance script may legitimately use some of these. Obfuscated "
+        "variants (string splitting, encoding) are not decoded.",
+        references=(REF_LOCAL_COMPROMISE, REF_OWASP_MCP05),
+        detection="Command line matched for privilege escalation, destructive deletion, download-to-shell, "
+        "reverse shells, decode-and-run, and credential paths. Severity by class.",
+    )
+)
+_add(
+    RuleMeta(
+        id="CFG-007",
+        title="Privileged container launch",
+        threat="T5",
+        property="A containerised server runs with the minimal privileges the sandbox is meant to provide.",
+        kind=Kind.WEAKNESS,
+        severity=Severity.HIGH,
+        confidence=Confidence.HIGH,
+        impact="`--privileged`, a mounted Docker socket, host network/PID namespaces or added "
+        "capabilities give the container (and anything that compromises it) host-level access, "
+        "defeating the reason it was containerised.",
+        mitigation="Drop the flag. Mount only needed paths, keep the default network namespace, add no "
+        "capabilities, and never mount the container runtime socket.",
+        limitations="Only `docker`/`podman`/`nerdctl run` command lines are inspected; compose files and "
+        "runtime defaults are not.",
+        references=(REF_LOCAL_COMPROMISE,),
+        detection="Flags: --privileged, --network/--net host, --pid host, --ipc host, --userns host, "
+        "--cap-add (SYS_ADMIN/ALL/…), --security-opt *unconfined, docker.sock mount, --user root/0.",
+    )
+)
+_add(
+    RuleMeta(
+        id="CFG-008",
+        title="Code-injection environment variable",
+        threat="T6",
+        property="The server process loads only the code of the server (hypothesis: loader/interpreter "
+        "environment variables alter process behaviour before the server runs).",
+        kind=Kind.INDICATOR,
+        severity=Severity.MEDIUM,
+        confidence=Confidence.MEDIUM,
+        impact="Variables such as NODE_OPTIONS, LD_PRELOAD, DYLD_INSERT_LIBRARIES, PYTHONPATH or BASH_ENV "
+        "make the runtime load extra code at start-up. In a shared or copied config they are a quiet "
+        "way to hook a legitimate server.",
+        mitigation="Remove the variable, or document exactly why the server needs it and what it loads.",
+        limitations="Some development setups set these legitimately (module paths, debuggers).",
+        references=(REF_LOCAL_COMPROMISE,),
+        detection="`env` contains a known loader/interpreter hook variable. Preload-style variables "
+        "and NODE_OPTIONS with --require/--import are raised to High.",
+    )
+)
+_add(
+    RuleMeta(
+        id="CFG-010",
+        title="Deprecated HTTP+SSE transport",
+        threat="T10",
+        property="Remote servers use the current Streamable HTTP transport.",
+        kind=Kind.WEAKNESS,
+        severity=Severity.LOW,
+        confidence=Confidence.HIGH,
+        impact="The 2024-11-05 HTTP+SSE transport is deprecated and eligible for removal; it predates the "
+        "Origin-validation, header-mirroring and authorization hardening of later revisions, and "
+        "support will disappear from clients and SDKs.",
+        mitigation="Migrate the server and the config entry to Streamable HTTP.",
+        limitations='Detection relies on `type: "sse"` or a URL ending in `/sse`; a legacy server '
+        "behind a different path is missed.",
+        references=(REF_STREAMABLE_HTTP, REF_DEPRECATED),
+        spec_note="Deprecated since 2025-03-26; formally Deprecated under the feature-lifecycle policy "
+        "in 2026-07-28 with a twelve-month minimum window.",
+        detection="transport resolves to `sse`.",
+    )
+)
+_add(
+    RuleMeta(
+        id="CFG-011",
+        title="Local HTTP server bound to all interfaces",
+        threat="T10",
+        property="A locally run HTTP server listens on loopback only (spec: SHOULD bind to 127.0.0.1).",
+        kind=Kind.WEAKNESS,
+        severity=Severity.MEDIUM,
+        confidence=Confidence.MEDIUM,
+        impact="Binding to 0.0.0.0/:: exposes the MCP endpoint to the LAN and, combined with missing "
+        "Origin checks or authentication, to any website via DNS rebinding.",
+        mitigation="Bind to 127.0.0.1 (or a Unix socket) and require authentication if the server must "
+        "be reachable by other hosts.",
+        limitations="Only recognises common host flags/env vars. Inside a container 0.0.0.0 is often "
+        "required and the exposure is governed by the port mapping instead.",
+        references=(REF_STREAMABLE_HTTP,),
+        detection="`--host`/`--bind`/`-H` or HOST-style env set to 0.0.0.0, ::, or *. High when no "
+        "credential-like env/arg is present.",
+    )
+)
+_add(
+    RuleMeta(
+        id="CFG-012",
+        title="Remote server with no visible authentication",
+        threat="T8",
+        property="Remote servers authenticate connections (spec: servers SHOULD implement authentication).",
+        kind=Kind.INFO,
+        severity=Severity.INFO,
+        confidence=Confidence.LOW,
+        impact="If the server really is unauthenticated, anyone who can reach it can use its tools. "
+        "Reported as information because OAuth discovery happens at runtime and is invisible here.",
+        mitigation="Confirm the server performs OAuth 2.1 discovery or otherwise authenticates; if it "
+        "is intentionally public, make sure it exposes nothing sensitive.",
+        limitations="Cannot observe runtime authorization. Expect this on every OAuth-protected server.",
+        references=(REF_AUTHZ, REF_STREAMABLE_HTTP),
+        detection="Non-loopback `url` with no `headers` and no auth-related keys in the entry.",
+    )
+)
+_add(
+    RuleMeta(
+        id="CFG-014",
+        title="Duplicate server definitions",
+        threat="T3",
+        property="Each server is defined once, so a reviewer knows which entry is in effect.",
+        kind=Kind.INFO,
+        severity=Severity.LOW,
+        confidence=Confidence.HIGH,
+        impact="Two entries launching the same package or URL under different names doubles the attack "
+        "surface and makes approvals ambiguous (which one did the user approve?).",
+        mitigation="Remove the redundant entry.",
+        limitations="Only within one file. Cross-file precedence (user vs project config) is "
+        "client-specific and not evaluated.",
+        references=(REF_TOOLS_NAMES,),
+        detection="Two servers in one file with the same command line or URL.",
+    )
+)
+_add(
+    RuleMeta(
+        id="CFG-015",
+        title="Sensitive parameter mirrored into an HTTP header",
+        threat="T9",
+        property="Parameters marked `x-mcp-header` carry no secrets or PII (spec: servers SHOULD NOT).",
+        kind=Kind.WEAKNESS,
+        severity=Severity.HIGH,
+        confidence=Confidence.HIGH,
+        impact="Header values are visible to every intermediary — load balancers, WAFs, logging — "
+        "so a mirrored token or personal identifier is exposed far beyond the server.",
+        mitigation="Remove `x-mcp-header` from the parameter; keep secrets in the request body only.",
+        limitations="Decided from the parameter's name and description; a parameter literally named "
+        "`token` that is not secret is a false positive.",
+        references=(REF_TOOLS_XHEADER,),
+        spec_note="`x-mcp-header` exists only in MCP 2026-07-28 and later.",
+        detection="A statically reachable property with `x-mcp-header` whose name or description "
+        "matches secret or PII vocabulary.",
+    )
+)
+_add(
+    RuleMeta(
+        id="TOOL-002",
+        title="Hidden or obfuscated content in tool metadata",
+        threat="T1",
+        property="Everything the model reads in a tool definition is visible to a human reviewer.",
+        kind=Kind.INDICATOR,
+        severity=Severity.MEDIUM,
+        confidence=Confidence.HIGH,
+        impact="Zero-width and bidirectional characters, Unicode tag characters, HTML comments, long "
+        "encoded blobs and whitespace padding let instructions reach the model while the UI shows "
+        "something innocuous.",
+        mitigation="Reject definitions containing invisible characters; render descriptions with "
+        "escapes visible before approving.",
+        limitations="Length-based signals (padding, outliers) are heuristics; right-to-left languages "
+        "and emoji are allowed and not flagged.",
+        references=(REF_INVARIANT, REF_CYBERARK, REF_CSA),
+        detection="Zero-width/bidi/tag code points (High confidence); HTML comments; base64/hex runs "
+        "≥ 64 chars; whitespace runs ≥ 100; description > 5x the catalogue median and > 2000 chars.",
+    )
+)
+_add(
+    RuleMeta(
+        id="TOOL-004",
+        title="Annotation contradicts apparent capability",
+        threat="T1",
+        property="Tool annotations are consistent with what the tool evidently does (spec: annotations "
+        "are untrusted hints; clients fall back to worst-case assumptions when absent).",
+        kind=Kind.INDICATOR,
+        severity=Severity.MEDIUM,
+        confidence=Confidence.MEDIUM,
+        impact="Clients that gate confirmation on `readOnlyHint`/`destructiveHint` will skip the prompt "
+        "for a tool that executes commands, writes, deletes or sends data if the server mislabels it.",
+        mitigation="Correct the annotations, or treat the server as untrusted so the client ignores "
+        "them. Never rely on annotations from a server you did not vet.",
+        limitations="Capability is inferred from names and descriptions; `remove_filter` or "
+        "`get_updates` can mislead the inference.",
+        references=(REF_TOOLS, REF_TOOLS_SECURITY),
+        detection="Capability class (exec, write, delete, send) inferred from name tokens, then first "
+        "sentence; compared with readOnlyHint/destructiveHint. Missing annotations on a sensitive "
+        "tool are reported as Info.",
+    )
+)
+_add(
+    RuleMeta(
+        id="TOOL-005",
+        title="Underspecified tool definition",
+        threat="T7",
+        property="A tool declares what it does and constrains what it accepts (spec: inputSchema MUST be "
+        "a valid object; servers MUST validate inputs).",
+        kind=Kind.INDICATOR,
+        severity=Severity.LOW,
+        confidence=Confidence.HIGH,
+        impact="A free-form `command`/`sql`/`path` string with no constraints is the shape of every "
+        "published MCP command-injection CVE; a missing description leaves the model (and the "
+        "reviewer) guessing what the tool does.",
+        mitigation="Describe the tool and each parameter; constrain strings with enum/pattern/maxLength; "
+        "set `additionalProperties: false`.",
+        limitations="Cannot see the server's own validation; a constrained-looking schema can still be "
+        "unsafe and a loose one can be validated server-side.",
+        references=(REF_TOOLS, REF_OWASP_MCP05),
+        detection="Missing/short description; missing inputSchema; open object; free-form string "
+        "parameter named command/cmd/shell/script/sql/query/path/url/code without constraints (Medium).",
+    )
+)
+_add(
+    RuleMeta(
+        id="TOOL-007",
+        title="Tool name collision or look-alike across servers",
+        threat="T3",
+        property="A tool name maps to one server (spec: uniqueness is per server; aggregating clients "
+        "SHOULD disambiguate).",
+        kind=Kind.INDICATOR,
+        severity=Severity.MEDIUM,
+        confidence=Confidence.HIGH,
+        impact="When two servers expose `search`, or one exposes `send_message` and another "
+        "`send-message`, the model may call the wrong one — the shadowing vector used to redirect "
+        "messages in published PoCs.",
+        mitigation="Use a client that prefixes tool names per server; avoid connecting servers with "
+        "overlapping tool names in one session.",
+        limitations="Needs more than one catalogue in the scan. Generic verbs (`search`) collide "
+        "innocently; the finding says which servers are involved.",
+        references=(REF_TOOLS_NAMES, REF_INVARIANT),
+        detection="Exact duplicates across catalogues with different server labels (High); normalised "
+        "or confusable-character matches (Medium); duplicates within one catalogue (Low).",
+    )
+)
+_add(
+    RuleMeta(
+        id="TOOL-008",
+        title="Untrusted-content ingress and side-effect tools in one catalogue",
+        threat="T4",
+        property="Content retrieved by a tool is data, not instructions (not enforceable by the "
+        "protocol; spec: clients SHOULD validate results).",
+        kind=Kind.INFO,
+        severity=Severity.INFO,
+        confidence=Confidence.MEDIUM,
+        impact="Indirect prompt injection needs an ingress (a tool that reads web pages, issues, mail) "
+        "and a sink (a tool that writes, sends, or executes). Listing both makes the chain visible.",
+        mitigation="Keep ingress and sink tools in separate sessions where possible; require "
+        "confirmation on sink tools; sanitise retrieved content.",
+        limitations="Surface enumeration only. Static analysis cannot detect prompt injection.",
+        references=(REF_TOOLS_SECURITY, REF_INVARIANT),
+        detection="`openWorldHint: true` or fetch/search/mail vocabulary → ingress; exec/write/send "
+        "vocabulary → sink. One Info finding per catalogue when an ingress tool exists.",
+    )
+)
+_add(
+    RuleMeta(
+        id="TOOL-009",
+        title="Invalid x-mcp-header annotation",
+        threat="T9",
+        property="`x-mcp-header` values satisfy the specification's constraints.",
+        kind=Kind.WEAKNESS,
+        severity=Severity.LOW,
+        confidence=Confidence.HIGH,
+        impact="Conforming clients MUST reject the whole tool; non-conforming clients may mirror "
+        "unexpected values into headers, where routing or policy decisions are made on them.",
+        mitigation="Use a valid HTTP token name, unique per schema, on primitive statically reachable "
+        "properties only.",
+        limitations="Checks the schema text only.",
+        references=(REF_TOOLS_XHEADER,),
+        spec_note="MCP 2026-07-28.",
+        detection="Empty/non-token names; duplicates (case-insensitive); non-primitive or `number` "
+        "types; placement under items/oneOf/anyOf/allOf/not/if/then/else/$ref.",
+    )
+)
+
+
+def get(rule_id: str) -> RuleMeta:
+    try:
+        return RULES[rule_id]
+    except KeyError as exc:  # pragma: no cover - programming error
+        raise KeyError(f"unknown rule {rule_id}") from exc
+
+
+def all_rule_ids() -> list[str]:
+    return sorted(RULES)

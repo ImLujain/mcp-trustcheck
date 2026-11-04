@@ -1,0 +1,23 @@
+CFG-001   medium   weakness  Unpinned package executed at launch
+CFG-002   medium   indicator Unexpected executable or inline interpreter code
+CFG-003   high     weakness  Shell-mediated server execution
+CFG-004   high     weakness  Dangerous command content
+CFG-005   high     weakness  Hardcoded credential in configuration
+CFG-006   medium   weakness  Over-broad filesystem access
+CFG-007   high     weakness  Privileged container launch
+CFG-008   medium   indicator Code-injection environment variable
+CFG-009   medium   weakness  Plaintext transport to a remote MCP server
+CFG-010   low      weakness  Deprecated HTTP+SSE transport
+CFG-011   medium   weakness  Local HTTP server bound to all interfaces
+CFG-012   info     info      Remote server with no visible authentication
+CFG-013   medium   weakness  Tool approval bypassed (auto-approve / trust)
+CFG-014   low      info      Duplicate server definitions
+CFG-015   high     weakness  Sensitive parameter mirrored into an HTTP header
+TOOL-001  medium   indicator Agent-directed instructions in tool metadata
+TOOL-002  medium   indicator Hidden or obfuscated content in tool metadata
+TOOL-004  medium   indicator Annotation contradicts apparent capability
+TOOL-005  low      indicator Underspecified tool definition
+TOOL-006  high     weakness  Tool definition changed since approved baseline
+TOOL-007  medium   indicator Tool name collision or look-alike across servers
+TOOL-008  info     info      Untrusted-content ingress and side-effect tools in one catalogue
+TOOL-009  low      weakness  Invalid x-mcp-header annotation

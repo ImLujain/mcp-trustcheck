@@ -1,0 +1,34 @@
+{
+  "mcpServers": {
+    "preload": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "example-mcp@1.0.0"
+      ],
+      "env": {
+        "LD_PRELOAD": "/Users/alice/Downloads/hook.so"
+      }
+    },
+    "node-require": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "example-mcp@1.0.1"
+      ],
+      "env": {
+        "NODE_OPTIONS": "--require /Users/alice/.cache/init.js"
+      }
+    },
+    "pythonpath": {
+      "command": "uvx",
+      "args": [
+        "example-mcp==1.0.0"
+      ],
+      "env": {
+        "PYTHONPATH": "/Users/alice/.cache/shim",
+        "BASH_ENV": "/tmp/env.sh"
+      }
+    }
+  }
+}

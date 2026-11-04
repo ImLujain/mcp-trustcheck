@@ -1,0 +1,162 @@
+{
+  "_comment": "file (relative to examples/) -> 'RULE@severity' findings expected from `mcp-trustcheck scan examples/` with no baseline. Multiplicity is exact. Every entry was reviewed by hand when added; see tests/integration/test_examples.py.",
+  "baselines/approved.json": [
+    "TOOL-008@info"
+  ],
+  "baselines/drifted.json": [
+    "TOOL-001@high",
+    "TOOL-004@info",
+    "TOOL-005@medium",
+    "TOOL-008@info"
+  ],
+  "configs/negative/benign-claude-desktop.json": [],
+  "configs/negative/benign-pinned-and-containers.json": [],
+  "configs/negative/benign-pipe-char-in-args.json": [
+    "CFG-003@info"
+  ],
+  "configs/negative/benign-placeholders.json": [],
+  "configs/negative/benign-vscode-inputs.json": [],
+  "configs/negative/benign-windows-cmd-wrapper.json": [
+    "CFG-003@low"
+  ],
+  "configs/positive/cfg-001-unpinned-packages.json": [
+    "CFG-001@medium",
+    "CFG-001@medium",
+    "CFG-001@medium",
+    "CFG-001@medium",
+    "CFG-001@medium",
+    "CFG-001@medium",
+    "CFG-003@info"
+  ],
+  "configs/positive/cfg-002-unexpected-executable.json": [
+    "CFG-002@high",
+    "CFG-002@high",
+    "CFG-002@medium",
+    "CFG-002@medium",
+    "CFG-003@info"
+  ],
+  "configs/positive/cfg-003-encoded-powershell.json": [
+    "CFG-003@critical"
+  ],
+  "configs/positive/cfg-003-shell-wrapper.json": [
+    "CFG-003@high",
+    "CFG-004@critical"
+  ],
+  "configs/positive/cfg-004-dangerous-content.json": [
+    "CFG-003@high",
+    "CFG-003@high",
+    "CFG-003@high",
+    "CFG-003@low",
+    "CFG-004@critical",
+    "CFG-004@critical",
+    "CFG-004@critical",
+    "CFG-004@high",
+    "CFG-004@high",
+    "CFG-004@high",
+    "CFG-004@high"
+  ],
+  "configs/positive/cfg-005-hardcoded-secrets.json": [
+    "CFG-005@critical",
+    "CFG-005@high",
+    "CFG-005@high",
+    "CFG-005@high",
+    "CFG-005@high"
+  ],
+  "configs/positive/cfg-006-filesystem-root.json": [
+    "CFG-004@high",
+    "CFG-006@high",
+    "CFG-006@high",
+    "CFG-006@high",
+    "CFG-006@medium"
+  ],
+  "configs/positive/cfg-007-privileged-container.json": [
+    "CFG-007@high",
+    "CFG-007@high",
+    "CFG-007@high"
+  ],
+  "configs/positive/cfg-008-env-injection.json": [
+    "CFG-008@high",
+    "CFG-008@high",
+    "CFG-008@high",
+    "CFG-008@medium"
+  ],
+  "configs/positive/cfg-009-plaintext-remote.json": [
+    "CFG-009@high",
+    "CFG-009@medium",
+    "CFG-012@info"
+  ],
+  "configs/positive/cfg-010-deprecated-sse.json": [
+    "CFG-010@low",
+    "CFG-010@low",
+    "CFG-012@info",
+    "CFG-012@info"
+  ],
+  "configs/positive/cfg-011-bind-all-interfaces.json": [
+    "CFG-011@high",
+    "CFG-011@high",
+    "CFG-011@medium"
+  ],
+  "configs/positive/cfg-012-no-auth-remote.json": [
+    "CFG-012@info"
+  ],
+  "configs/positive/cfg-013-auto-approve.json": [
+    "CFG-013@high",
+    "CFG-013@high",
+    "CFG-013@medium"
+  ],
+  "configs/positive/cfg-014-duplicate-servers.json": [
+    "CFG-014@low",
+    "CFG-014@low"
+  ],
+  "tools/negative/clean-weather-tools.json": [
+    "TOOL-008@info"
+  ],
+  "tools/negative/distinct/server-x.json": [],
+  "tools/negative/distinct/server-y.json": [],
+  "tools/positive/collision/server-a.json": [
+    "TOOL-004@info"
+  ],
+  "tools/positive/collision/server-b.json": [
+    "TOOL-004@info",
+    "TOOL-007@low",
+    "TOOL-007@medium",
+    "TOOL-007@medium",
+    "TOOL-007@medium"
+  ],
+  "tools/positive/tool-001-param-and-crosstool.json": [
+    "TOOL-001@high"
+  ],
+  "tools/positive/tool-001-poisoned-description.json": [
+    "TOOL-001@high"
+  ],
+  "tools/positive/tool-002-hidden-unicode.json": [
+    "TOOL-001@low",
+    "TOOL-001@low",
+    "TOOL-002@medium",
+    "TOOL-002@medium",
+    "TOOL-002@medium"
+  ],
+  "tools/positive/tool-004-annotation-mismatch.json": [
+    "TOOL-004@info",
+    "TOOL-004@medium",
+    "TOOL-004@medium"
+  ],
+  "tools/positive/tool-005-underspecified.json": [
+    "TOOL-005@low",
+    "TOOL-005@low",
+    "TOOL-005@medium",
+    "TOOL-005@medium"
+  ],
+  "tools/positive/tool-009-cfg-015-headers.json": [
+    "CFG-015@high",
+    "CFG-015@high",
+    "TOOL-009@low"
+  ],
+  "_skipped": {
+    "expected.json": "not_recognised",
+    "robustness/binary.json": "binary",
+    "robustness/empty.json": "empty",
+    "robustness/malformed.json": "invalid_json",
+    "robustness/unrecognised.json": "not_recognised"
+  }
+}

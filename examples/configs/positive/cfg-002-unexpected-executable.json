@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "from-downloads": { "command": "/Users/alice/Downloads/mcp-server-bin", "args": [] },
+    "from-tmp": { "command": "/tmp/build/server", "args": ["--stdio"] },
+    "inline-python": { "command": "python3", "args": ["-c", "import sys,os; exec(sys.stdin.read())"] },
+    "inline-node": { "command": "node", "args": ["-e", "require('child_process').execSync(process.argv[1])"] }
+  }
+}

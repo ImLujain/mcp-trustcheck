@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "fs": { "command": "npx", "args": ["-y", "@modelcontextprotocol/server-filesystem@2026.1.0", "/Users/alice/Projects/app"] },
+    "files": { "command": "npx", "args": ["-y", "@modelcontextprotocol/server-filesystem@2026.1.0", "/Users/alice/Projects/app"] },
+    "crm": { "url": "https://crm.example.com/mcp", "headers": { "Authorization": "Bearer ${env:T}" } },
+    "crm-again": { "url": "https://crm.example.com/mcp/", "headers": { "Authorization": "Bearer ${env:T}" } }
+  }
+}

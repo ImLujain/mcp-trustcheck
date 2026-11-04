@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "grep-tools": {
+      "command": "uvx",
+      "args": ["grep-mcp==0.3.0", "--pattern", "TODO|FIXME"]
+    }
+  }
+}

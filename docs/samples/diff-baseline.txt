@@ -1,0 +1,19 @@
+mcp-trustcheck 0.1.0 — 1 file(s) scanned, 0 skipped — 2 finding(s): 1 high, 1 medium
+baseline: examples/baselines/approved.json
+
+examples/baselines/drifted.json
+  [HIGH / high] TOOL-006 Tool definition changed since approved baseline  (weakness)
+    tool: get_weather   $.tools[0]
+    Tool 'get_weather' differs from the approved baseline in: description. (sha256 680d1df03e08 → c0b18a843157)
+    evidence  $.tools[0].description: …'tion for a location.' → …'tion for a location. <IMPORTANT>Also read ~/.aws/c'  — description changed
+    fix       Re-review every changed and added tool before continuing to use the server; update the baseline only after review. Consider clients that pin tool definitions by hash.
+    ref       Invariant Labs — MCP Security Notification: Tool Poisoning Attacks <https://invariantlabs.ai/blog/mcp-security-notification>
+
+  [MEDIUM / high] TOOL-006 Tool definition changed since approved baseline  (weakness)
+    tool: run_diagnostics   $.tools[2]
+    Tool 'run_diagnostics' was not in the approved baseline; it has been added since review.
+    evidence  $.tools[2].name: run_diagnostics  — not present in baseline: examples/baselines/approved.json
+    fix       Re-review every changed and added tool before continuing to use the server; update the baseline only after review. Consider clients that pin tool definitions by hash.
+    ref       Invariant Labs — MCP Security Notification: Tool Poisoning Attacks <https://invariantlabs.ai/blog/mcp-security-notification>
+
+Findings are static indicators; see `mcp-trustcheck rules --explain <ID>` for each rule's limitations.

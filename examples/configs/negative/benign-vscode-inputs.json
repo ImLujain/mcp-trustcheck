@@ -1,0 +1,18 @@
+{
+  "inputs": [
+    { "type": "promptString", "id": "github-token", "description": "GitHub PAT", "password": true }
+  ],
+  "servers": {
+    "github": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-github@2026.1.0"],
+      "env": { "GITHUB_PERSONAL_ACCESS_TOKEN": "${input:github-token}" }
+    },
+    "project-fs": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-filesystem@2026.1.0", "${workspaceFolder}"]
+    }
+  }
+}

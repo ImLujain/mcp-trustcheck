@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "pinned-npx": { "command": "npx", "args": ["-y", "@example/weather-mcp@3.4.1"] },
+    "pinned-uvx": { "command": "uvx", "args": ["--from", "mcp-server-time==1.2.0", "mcp-server-time"] },
+    "git-sha": { "command": "npx", "args": ["-y", "github:example/weather-mcp#9f8e7d6c5b4a3f2e1d0c9b8a7f6e5d4c3b2a1f0e"] },
+    "local-path": { "command": "node", "args": ["/Users/alice/Projects/mcp/dist/index.js"] },
+    "plain-docker": { "command": "docker", "args": ["run", "-i", "--rm", "--read-only", "--cap-drop", "ALL", "-v", "/Users/alice/Projects/app:/data:ro", "example.invalid/mcp:1.0"] },
+    "benign-env": { "command": "npx", "args": ["-y", "example-mcp@1.0.0"], "env": { "LOG_LEVEL": "debug", "NO_COLOR": "1", "HOST_LABEL": "dev" } },
+    "loopback-http": { "command": "uvx", "args": ["example-http-mcp==1.0.0", "--host", "127.0.0.1", "--port", "8000"] },
+    "remove-filter-tool-server": { "url": "https://api.example.com/mcp", "oauth": { "clientId": "mcp-trustcheck-example" } }
+  }
+}

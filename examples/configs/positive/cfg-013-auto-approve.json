@@ -1,0 +1,34 @@
+{
+  "mcpServers": {
+    "shell-tools": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "shell-tools-mcp@3.1.0"
+      ],
+      "autoApprove": [
+        "*"
+      ]
+    },
+    "notes": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "notes-mcp@1.0.0"
+      ],
+      "autoApprove": [
+        "list_notes",
+        "read_note",
+        "delete_note"
+      ]
+    },
+    "gemini-style": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "notes-mcp@1.0.1"
+      ],
+      "trust": true
+    }
+  }
+}

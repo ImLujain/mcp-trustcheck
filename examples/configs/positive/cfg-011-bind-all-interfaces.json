@@ -1,0 +1,7 @@
+{
+  "mcpServers": {
+    "open-http": { "command": "uvx", "args": ["example-http-mcp==1.0.0", "--transport", "streamable-http", "--host", "0.0.0.0", "--port", "8000"] },
+    "env-bind": { "command": "node", "args": ["server.js"], "env": { "HOST": "::", "PORT": "9000" } },
+    "with-auth": { "command": "uvx", "args": ["example-http-mcp==1.0.0", "--host=0.0.0.0"], "env": { "MCP_AUTH_TOKEN": "${env:MCP_AUTH_TOKEN}" } }
+  }
+}

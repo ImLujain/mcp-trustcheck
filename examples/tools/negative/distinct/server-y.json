@@ -1,0 +1,8 @@
+{
+  "server": "tasks",
+  "tools": [
+    { "name": "tasks_list", "description": "Lists open tasks.", "inputSchema": { "type": "object", "additionalProperties": false }, "annotations": { "readOnlyHint": true, "openWorldHint": false } },
+    { "name": "tasks_complete", "description": "Marks a task as complete.", "inputSchema": { "type": "object", "properties": { "task_id": { "type": "string", "pattern": "^[a-z0-9-]{8,36}$" } }, "required": ["task_id"] }, "annotations": { "readOnlyHint": false, "destructiveHint": false, "idempotentHint": true, "openWorldHint": false } },
+    { "name": "tasks_route_hint", "description": "Returns the shard that owns a task.", "inputSchema": { "type": "object", "properties": { "region": { "type": "string", "enum": ["eu", "us"], "x-mcp-header": "Region" } }, "required": ["region"] }, "annotations": { "readOnlyHint": true, "openWorldHint": false } }
+  ]
+}

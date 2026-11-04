@@ -1,0 +1,73 @@
+[build-system]
+requires = ["setuptools>=77", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mcp-trustcheck"
+version = "0.1.0"
+description = "Read-only static security auditing for Model Context Protocol (MCP) client configurations and tool catalogues."
+readme = "README.md"
+requires-python = ">=3.10"
+license = "Apache-2.0"
+license-files = ["LICENSE"]
+authors = [{ name = "Lujain" }]
+keywords = ["mcp", "model-context-protocol", "security", "static-analysis", "ai-agents"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Environment :: Console",
+  "Intended Audience :: Developers",
+  "Intended Audience :: Information Technology",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Topic :: Security",
+  "Typing :: Typed",
+]
+# Runtime dependencies are intentionally empty: the tool must not reach the
+# network, execute commands, or depend on external services (design.md §6).
+dependencies = []
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.0",
+  "jsonschema>=4.21",
+  "ruff>=0.5",
+  "mypy>=1.10",
+]
+
+[project.urls]
+Homepage = "https://github.com/ImLujain/mcp-trustcheck"
+Documentation = "https://github.com/ImLujain/mcp-trustcheck/tree/main/docs"
+Issues = "https://github.com/ImLujain/mcp-trustcheck/issues"
+Changelog = "https://github.com/ImLujain/mcp-trustcheck/blob/main/CHANGELOG.md"
+
+[project.scripts]
+mcp-trustcheck = "mcp_trustcheck.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+mcp_trustcheck = ["py.typed"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.ruff]
+target-version = "py310"
+line-length = 100
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "S", "N", "C4", "SIM", "RUF"]
+ignore = ["S101", "E501"]  # S101: asserts; E501: ruff-format owns code width, prose strings may run long
+per-file-ignores = { "tests/**" = ["S", "B011"] }
+
+[tool.mypy]
+python_version = "3.10"
+strict = true
+mypy_path = "src"
+packages = ["mcp_trustcheck"]

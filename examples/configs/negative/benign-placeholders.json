@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "template": {
+      "command": "npx",
+      "args": ["-y", "some-mcp@1.0.0"],
+      "env": {
+        "API_KEY": "<your-api-key>",
+        "SECRET": "",
+        "TOKEN": "xxxxxxxxxxxxxxxx",
+        "PASSWORD": "$MY_PASSWORD"
+      }
+    }
+  }
+}
