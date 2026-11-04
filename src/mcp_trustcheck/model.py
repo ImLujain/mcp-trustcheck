@@ -132,6 +132,27 @@ class Reference:
 
 
 @dataclass(frozen=True)
+class Standard:
+    """A weakness-taxonomy or risk-catalogue entry the rule maps to (CWE, OWASP MCP Top 10, ...).
+
+    Distinct from `Reference`: a reference is reading material; a standard is a stable identifier a
+    reviewer can cite in a report or map to a control framework.
+    """
+
+    framework: str  # "CWE" | "OWASP MCP Top 10" | "OWASP LLM Top 10"
+    id: str  # "CWE-798", "MCP01:2025", "LLM02:2025"
+    title: str
+    url: str
+
+    @property
+    def label(self) -> str:
+        return f"{self.id} {self.title}"
+
+    def to_dict(self) -> dict[str, str]:
+        return {"framework": self.framework, "id": self.id, "title": self.title, "url": self.url}
+
+
+@dataclass(frozen=True)
 class Evidence:
     json_path: str
     snippet: str  # always redacted and <= 512 chars by the time it is stored
@@ -181,6 +202,7 @@ class Finding:
     references: list[Reference]
     limitations: str
     spec_note: str | None = None
+    standards: list[Standard] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
         d: dict[str, Any] = {
@@ -196,6 +218,7 @@ class Finding:
             "impact": self.impact,
             "mitigation": self.mitigation,
             "references": [r.to_dict() for r in self.references],
+            "standards": [s.to_dict() for s in self.standards],
             "limitations": self.limitations,
         }
         if self.spec_note:
@@ -260,7 +283,7 @@ class Report:
     findings: list[Finding]
     baseline: str | None = None
     errors: list[dict[str, str]] = field(default_factory=list)
-    schema_version: str = "1.0"
+    schema_version: str = "1.1"
 
     def to_dict(self) -> dict[str, Any]:
         findings = sort_findings(self.findings)

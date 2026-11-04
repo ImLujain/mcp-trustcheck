@@ -24,7 +24,7 @@ examples/configs/positive/cfg-003-shell-wrapper.json
     ref       MCP Security Best Practices — Local MCP Server Compromise <https://modelcontextprotocol.io/docs/2026-07-28/tutorials/security/security_best_practices#local-mcp-server-compromise>
 ```
 
-> **Status:** 0.1.0, research-grade MVP. 23 checks, 99 tests, zero runtime dependencies, Python ≥ 3.10.
+> **Status:** 0.1.0, research-grade MVP. 23 checks, 103 tests, zero runtime dependencies, Python ≥ 3.10.
 > Findings are static indicators and configuration weaknesses — **not** proof that a server is malicious
 > or that a vulnerability is exploitable. Read [Limitations](#limitations) before relying on a result.
 
@@ -123,33 +123,36 @@ labels the catalogue for cross-server checks.
 
 ## What it checks
 
-| ID | Check | Threat | Kind | Default severity / confidence |
-|---|---|---|---|---|
-| `CFG-001` | Unpinned package executed at launch | T6 | weakness | medium / medium |
-| `CFG-002` | Unexpected executable or inline interpreter code | T6 | indicator | medium / medium |
-| `CFG-003` | Shell-mediated server execution | T6 | weakness | high / high |
-| `CFG-004` | Dangerous command content | T6 | weakness | high / high |
-| `CFG-005` | Hardcoded credential in configuration | T9 | weakness | high / high |
-| `CFG-006` | Over-broad filesystem access | T5 | weakness | medium / medium |
-| `CFG-007` | Privileged container launch | T5 | weakness | high / high |
-| `CFG-008` | Code-injection environment variable | T6 | indicator | medium / medium |
-| `CFG-009` | Plaintext transport to a remote MCP server | T10 | weakness | medium / high |
-| `CFG-010` | Deprecated HTTP+SSE transport | T10 | weakness | low / high |
-| `CFG-011` | Local HTTP server bound to all interfaces | T10 | weakness | medium / medium |
-| `CFG-012` | Remote server with no visible authentication | T8 | info | info / low |
-| `CFG-013` | Tool approval bypassed (auto-approve / trust) | T11 | weakness | medium / high |
-| `CFG-014` | Duplicate server definitions | T3 | info | low / high |
-| `CFG-015` | Sensitive parameter mirrored into an HTTP header | T9 | weakness | high / high |
-| `TOOL-001` | Agent-directed instructions in tool metadata | T1 | indicator | medium / low |
-| `TOOL-002` | Hidden or obfuscated content in tool metadata | T1 | indicator | medium / high |
-| `TOOL-004` | Annotation contradicts apparent capability | T1 | indicator | medium / medium |
-| `TOOL-005` | Underspecified tool definition | T7 | indicator | low / high |
-| `TOOL-006` | Tool definition changed since approved baseline | T2 | weakness | high / high |
-| `TOOL-007` | Tool name collision or look-alike across servers | T3 | indicator | medium / high |
-| `TOOL-008` | Untrusted-content ingress and side-effect tools in one catalogue | T4 | info | info / medium |
-| `TOOL-009` | Invalid x-mcp-header annotation | T9 | weakness | low / high |
+| ID | Check | Threat | Kind | Default severity / confidence | Standards |
+|---|---|---|---|---|---|
+| `CFG-001` | Unpinned package executed at launch | T6 | weakness | medium / medium | CWE-829, CWE-494, MCP04:2025, LLM03:2025 |
+| `CFG-002` | Unexpected executable or inline interpreter code | T6 | indicator | medium / medium | CWE-829, MCP05:2025, LLM03:2025 |
+| `CFG-003` | Shell-mediated server execution | T6 | weakness | high / high | CWE-78, MCP05:2025 |
+| `CFG-004` | Dangerous command content | T6 | weakness | high / high | CWE-78, CWE-494, CWE-250, MCP05:2025 |
+| `CFG-005` | Hardcoded credential in configuration | T9 | weakness | high / high | CWE-798, CWE-312, MCP01:2025, LLM02:2025 |
+| `CFG-006` | Over-broad filesystem access | T5 | weakness | medium / medium | CWE-250, CWE-284, MCP02:2025, LLM06:2025 |
+| `CFG-007` | Privileged container launch | T5 | weakness | high / high | CWE-250, CWE-269, MCP02:2025, LLM06:2025 |
+| `CFG-008` | Code-injection environment variable | T6 | indicator | medium / medium | CWE-427, CWE-94, MCP05:2025 |
+| `CFG-009` | Plaintext transport to a remote MCP server | T10 | weakness | medium / high | CWE-319, CWE-523, MCP01:2025, MCP07:2025 |
+| `CFG-010` | Deprecated HTTP+SSE transport | T10 | weakness | low / high | CWE-477, MCP07:2025 |
+| `CFG-011` | Local HTTP server bound to all interfaces | T10 | weakness | medium / medium | CWE-1327, CWE-668, MCP07:2025, MCP09:2025 |
+| `CFG-012` | Remote server with no visible authentication | T8 | info | info / low | CWE-306, MCP07:2025 |
+| `CFG-013` | Tool approval bypassed (auto-approve / trust) | T11 | weakness | medium / high | CWE-862, MCP02:2025, LLM06:2025 |
+| `CFG-014` | Duplicate server definitions | T3 | info | low / high | CWE-694, MCP09:2025 |
+| `CFG-015` | Sensitive parameter mirrored into an HTTP header | T9 | weakness | high / high | CWE-200, CWE-522, MCP01:2025, LLM02:2025 |
+| `TOOL-001` | Agent-directed instructions in tool metadata | T1 | indicator | medium / low | CWE-1427, MCP03:2025, MCP06:2025, LLM01:2025 |
+| `TOOL-002` | Hidden or obfuscated content in tool metadata | T1 | indicator | medium / high | CWE-1427, CWE-506, MCP03:2025, LLM01:2025 |
+| `TOOL-004` | Annotation contradicts apparent capability | T1 | indicator | medium / medium | CWE-451, MCP03:2025, LLM06:2025 |
+| `TOOL-005` | Underspecified tool definition | T7 | indicator | low / high | CWE-20, CWE-1059, MCP05:2025, LLM06:2025 |
+| `TOOL-006` | Tool definition changed since approved baseline | T2 | weakness | high / high | CWE-345, CWE-829, MCP03:2025, MCP04:2025, LLM03:2025 |
+| `TOOL-007` | Tool name collision or look-alike across servers | T3 | indicator | medium / high | CWE-694, CWE-451, MCP03:2025, MCP09:2025 |
+| `TOOL-008` | Untrusted-content ingress and side-effect tools in one catalogue | T4 | info | info / medium | CWE-1427, CWE-250, MCP06:2025, MCP10:2025, LLM01:2025, LLM06:2025 |
+| `TOOL-009` | Invalid x-mcp-header annotation | T9 | weakness | low / high | CWE-20, MCP01:2025 |
 
-Threat IDs refer to [`docs/threat-model.md`](docs/threat-model.md). Every rule has a seven-point
+Threat IDs refer to [`docs/threat-model.md`](docs/threat-model.md). Standards are
+[CWE](https://cwe.mitre.org/) identifiers, the [OWASP MCP Top 10 (2025)](https://owasp.org/www-project-mcp-top-10/)
+and the [OWASP Top 10 for LLM Applications (2025)](https://genai.owasp.org/llm-top-10/); each finding
+carries them with titles and links, so a report line can be cited without the catalogue. Every rule has a seven-point
 write-up — property, threat and preconditions, synthetic example, detection logic, false
 positives/negatives, mitigation, references — in [`docs/methodology.md`](docs/methodology.md), and
 `mcp-trustcheck rules --explain ID` prints the same information.
@@ -184,7 +187,7 @@ threat model (§5).
 ## Example JSON finding
 
 Every finding carries a stable ID (hash of rule, file, location), the redacted evidence, the impact,
-the mitigation, the references and the rule's own limitations. The full report schema is
+the mitigation, the references, the standards mapping (CWE / OWASP identifiers) and the rule's own limitations. The full report schema is
 [`docs/schema/report.schema.json`](docs/schema/report.schema.json).
 
 ```json
@@ -218,6 +221,32 @@ the mitigation, the references and the rule's own limitations. The full report s
     {
       "title": "MCP Security Best Practices — Token Passthrough",
       "url": "https://modelcontextprotocol.io/docs/2026-07-28/tutorials/security/security_best_practices#token-passthrough"
+    }
+  ],
+  "standards": [
+    {
+      "framework": "CWE",
+      "id": "CWE-798",
+      "title": "Use of Hard-coded Credentials",
+      "url": "https://cwe.mitre.org/data/definitions/798.html"
+    },
+    {
+      "framework": "CWE",
+      "id": "CWE-312",
+      "title": "Cleartext Storage of Sensitive Information",
+      "url": "https://cwe.mitre.org/data/definitions/312.html"
+    },
+    {
+      "framework": "OWASP MCP Top 10",
+      "id": "MCP01:2025",
+      "title": "Token Mismanagement & Secret Exposure",
+      "url": "https://owasp.org/www-project-mcp-top-10/"
+    },
+    {
+      "framework": "OWASP LLM Top 10",
+      "id": "LLM02:2025",
+      "title": "Sensitive Information Disclosure",
+      "url": "https://genai.owasp.org/llm-top-10/"
     }
   ],
   "limitations": "Known-prefix matches are reliable; key-name and entropy matches are heuristics and may flag opaque identifiers that are not secrets. Low-entropy passwords without a recognisable key name are missed."
@@ -257,7 +286,7 @@ Everything in this README was produced from the repository as committed:
 
 ```bash
 pip install -e ".[dev]"
-pytest                                   # 99 tests: unit, integration, hardening, docs-in-sync
+pytest                                   # 103 tests: unit, integration, hardening, docs-in-sync
 mcp-trustcheck scan examples/ --fail-on never          # the run quoted above
 mcp-trustcheck diff --baseline examples/baselines/approved.json examples/baselines/drifted.json
 ```

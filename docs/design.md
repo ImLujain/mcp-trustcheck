@@ -106,11 +106,12 @@ Finding:
   impact        str
   mitigation    str
   references    [ { title, url } ]
+  standards     [ { framework, id, title, url } ]   CWE / OWASP MCP Top 10 / OWASP LLM Top 10
   limitations   str   # the FP/FN statement for this rule
   spec_note     str?  # which protocol revision the rationale depends on
 
 Report:
-  schema_version  "1.0"
+  schema_version  "1.1"
   tool            { name, version }
   generated_at    ISO-8601 UTC
   scan            { inputs[], files_scanned[], files_skipped[{path, reason}], rules_run[], baseline? }
@@ -136,7 +137,7 @@ mcp-trustcheck --version
 
 Exit codes: `0` no finding at or above `--fail-on` (default `high`); `1` at least one such finding; `2` usage error or no scannable input; `3` internal error (traceback only with `-v`). Skipped files never change the exit code.
 
-Terminal output: grouped by file → server/tool, one block per finding with `[SEVERITY/confidence] RULE title`, evidence snippet, mitigation, reference. Colour only when stdout is a TTY and `--no-color` is absent; `NO_COLOR` env honoured. `--format json` writes the Report object and nothing else to stdout (or `--output`).
+Terminal output: grouped by file → server/tool, one numbered block per finding with `[SEVERITY/confidence] RULE title`, then aligned `where` / `what` / `evidence` / `fix` / `standards` / `refs` rows; every reference and standard the rule carries is printed. Colour only when stdout is a TTY and `--no-color` is absent; `NO_COLOR` env honoured. `--format json` writes the Report object and nothing else to stdout (or `--output`).
 
 ---
 

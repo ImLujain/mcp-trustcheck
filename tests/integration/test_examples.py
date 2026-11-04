@@ -72,9 +72,8 @@ def test_json_report_validates_against_schema(report, schema_path: Path) -> None
         data
     )
     assert data["summary"]["total"] == len(data["findings"])
-    assert {"path": "examples/expected.json", "reason": "not_recognised"} in data["scan"][
-        "files_skipped"
-    ]
+    skipped = {(s["path"], s["reason"]) for s in data["scan"]["files_skipped"]}
+    assert ("examples/expected.json", "not_recognised") in skipped
 
 
 def test_no_fixture_secret_leaks_into_any_output(report) -> None:  # type: ignore[no-untyped-def]

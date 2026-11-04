@@ -90,7 +90,11 @@ def scan(opts: ScanOptions) -> Report:
         ctx.baseline_path = opts.baseline
     if not scanned:
         reasons = (
-            ", ".join(f"{s.path} ({s.reason})" for s in disc.skipped[:5]) or "no JSON files found"
+            ", ".join(
+                f"{s.path} ({s.reason}{': ' + s.detail if s.detail else ''})"
+                for s in disc.skipped[:5]
+            )
+            or "no JSON files found"
         )
         raise ScanError(f"nothing to scan: {reasons}")
 

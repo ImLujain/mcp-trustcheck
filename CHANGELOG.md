@@ -8,6 +8,12 @@ All notable changes to this project are documented here. The format follows
 Initial MVP.
 
 ### Added
+- Standards mapping on every rule: CWE identifiers plus OWASP MCP Top 10 (2025) and OWASP Top 10
+  for LLM Applications (2025) entries. Carried on each finding (`standards[]`, report schema 1.1),
+  in `rules --explain` / `rules --format json`, and in `docs/methodology.md`.
+- Terminal report reorganised: numbered findings with aligned `where` / `what` / `evidence` / `fix` /
+  `standards` / `refs` rows; every reference is printed, not just the first.
+- `not_recognised` skips now say what structure was looked for.
 - `scan`, `diff` and `rules` commands; terminal and JSON output; deterministic exit codes.
 - 23 checks (15 configuration, 8 tool-definition) with separate severity and confidence, each mapped
   to a security property or stated hypothesis (`docs/methodology.md`).
@@ -15,7 +21,7 @@ Initial MVP.
   `tools/list` results, `{tools:[…]}` objects or bare arrays.
 - Baseline drift detection (offline rug-pull detection) via canonical SHA-256 per tool.
 - Scan-wide secret redaction applied at finding construction.
-- 34 synthetic fixtures with a hand-reviewed oracle, 99 tests, strict typing, zero runtime
+- 34 synthetic fixtures with a hand-reviewed oracle, 103 tests, strict typing, zero runtime
   dependencies.
 
 ### Security (of the tool itself)

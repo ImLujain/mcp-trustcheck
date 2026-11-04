@@ -103,6 +103,7 @@ def emit(
         references=list(meta.references),
         limitations=meta.limitations,
         spec_note=meta.spec_note,
+        standards=list(meta.standards),
     )
 
 

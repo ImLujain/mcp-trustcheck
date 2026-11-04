@@ -214,6 +214,7 @@ def rule_section(meta: rules_catalog.RuleMeta) -> str:
         Kind.INFO: "info (no weakness asserted)",
     }[meta.kind]
     refs = "\n".join(f"   - [{r.title}]({r.url})" for r in meta.references)
+    stds = "\n".join(f"   - [{s.id}]({s.url}) {s.title} — {s.framework}" for s in meta.standards)
     spec = f"\n   *Spec note:* {meta.spec_note}" if meta.spec_note else ""
     return f"""### {meta.id} — {meta.title}
 
@@ -231,8 +232,10 @@ def rule_section(meta: rules_catalog.RuleMeta) -> str:
    - *False negatives:* {n.false_negatives}
    - {meta.limitations}
 6. **Mitigation.** {meta.mitigation}
-7. **References.**
-{refs}{spec}
+7. **References and standards.**
+{refs}
+   *Standards mapping:*
+{stds}{spec}
 
 *Impact if true:* {meta.impact}
 """
@@ -253,7 +256,8 @@ def main() -> str:
         "",
         "Every implemented check is documented below on the same seven points the project brief requires: the security "
         "property evaluated, the threat and its preconditions, a synthetic example from `examples/`, the detection logic, "
-        "false-positive and false-negative limitations, a practical mitigation, and the primary reference. Threat IDs "
+        "false-positive and false-negative limitations, a practical mitigation, and the references plus a standards "
+        "mapping (CWE, OWASP MCP Top 10 2025, OWASP Top 10 for LLM Applications 2025). Threat IDs "
         "refer to `docs/threat-model.md` §3; severity and confidence semantics are defined in §5 of that document.",
         "",
         "**How to read severity and confidence.** Severity is the impact *if the finding is true*; confidence is how "

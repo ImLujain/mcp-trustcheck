@@ -152,6 +152,7 @@ def _cmd_rules(args: argparse.Namespace) -> int:
                 "mitigation": m.mitigation,
                 "limitations": m.limitations,
                 "references": [r.to_dict() for r in m.references],
+                "standards": [s.to_dict() for s in m.standards],
                 "spec_note": m.spec_note,
             }
             for m in metas
@@ -174,6 +175,9 @@ def _cmd_rules(args: argparse.Namespace) -> int:
                 ("Spec note", m.spec_note or "—"),
             ):
                 print(f"  {label}:\n    {text}")
+            print("  Standards:")
+            for s in m.standards:
+                print(f"    - {s.id}  {s.title}  ({s.framework})\n      {s.url}")
             print("  References:")
             for r in m.references:
                 print(f"    - {r.title}\n      {r.url}")

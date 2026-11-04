@@ -134,7 +134,11 @@ def load_one(
         return SkippedFile(display, "too_deep", f"nesting exceeds {MAX_DEPTH}")
     kind = detect_kind(data)
     if kind is None:
-        return SkippedFile(display, "not_recognised")
+        return SkippedFile(
+            display,
+            "not_recognised",
+            "no `mcpServers`, `servers`, `mcp.servers` or `tools` structure found",
+        )
     return LoadedFile(path=path, display=display, kind=kind[0], dialect=kind[1], data=data)
 
 

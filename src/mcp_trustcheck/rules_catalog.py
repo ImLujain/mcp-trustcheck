@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from mcp_trustcheck.model import Confidence, Kind, Reference, Severity
+from mcp_trustcheck.model import Confidence, Kind, Reference, Severity, Standard
 
 SPEC = "https://modelcontextprotocol.io/specification/2026-07-28"
 BEST_PRACTICES = (
@@ -57,6 +57,74 @@ REF_OAUTH21 = Reference(
 )
 
 
+# --------------------------------------------------------------------------- standards
+# Stable identifiers a reviewer can cite or map to a control framework. CWE entries are the
+# MITRE weakness taxonomy; the OWASP MCP Top 10 (2025, beta) and the OWASP Top 10 for LLM
+# Applications (2025) are the two risk catalogues closest to this tool's scope. Each rule maps to
+# at least one CWE. Titles are reproduced verbatim from the source at the time of writing.
+
+CWE_URL = "https://cwe.mitre.org/data/definitions/{n}.html"
+OWASP_MCP_URL = "https://owasp.org/www-project-mcp-top-10/"
+OWASP_LLM_URL = "https://genai.owasp.org/llm-top-10/"
+
+
+def _cwe(n: int, title: str) -> Standard:
+    return Standard("CWE", f"CWE-{n}", title, CWE_URL.format(n=n))
+
+
+def _mcp(n: str, title: str) -> Standard:
+    return Standard("OWASP MCP Top 10", f"MCP{n}:2025", title, OWASP_MCP_URL)
+
+
+def _llm(n: str, title: str) -> Standard:
+    return Standard("OWASP LLM Top 10", f"LLM{n}:2025", title, OWASP_LLM_URL)
+
+
+CWE_20 = _cwe(20, "Improper Input Validation")
+CWE_78 = _cwe(
+    78, "Improper Neutralization of Special Elements used in an OS Command ('OS Command Injection')"
+)
+CWE_94 = _cwe(94, "Improper Control of Generation of Code ('Code Injection')")
+CWE_200 = _cwe(200, "Exposure of Sensitive Information to an Unauthorized Actor")
+CWE_250 = _cwe(250, "Execution with Unnecessary Privileges")
+CWE_269 = _cwe(269, "Improper Privilege Management")
+CWE_284 = _cwe(284, "Improper Access Control")
+CWE_306 = _cwe(306, "Missing Authentication for Critical Function")
+CWE_312 = _cwe(312, "Cleartext Storage of Sensitive Information")
+CWE_319 = _cwe(319, "Cleartext Transmission of Sensitive Information")
+CWE_345 = _cwe(345, "Insufficient Verification of Data Authenticity")
+CWE_427 = _cwe(427, "Uncontrolled Search Path Element")
+CWE_451 = _cwe(451, "User Interface (UI) Misrepresentation of Critical Information")
+CWE_477 = _cwe(477, "Use of Obsolete Function")
+CWE_494 = _cwe(494, "Download of Code Without Integrity Check")
+CWE_506 = _cwe(506, "Embedded Malicious Code")
+CWE_522 = _cwe(522, "Insufficiently Protected Credentials")
+CWE_523 = _cwe(523, "Unprotected Transport of Credentials")
+CWE_668 = _cwe(668, "Exposure of Resource to Wrong Sphere")
+CWE_694 = _cwe(694, "Use of Multiple Resources with Duplicate Identifier")
+CWE_798 = _cwe(798, "Use of Hard-coded Credentials")
+CWE_829 = _cwe(829, "Inclusion of Functionality from Untrusted Control Sphere")
+CWE_862 = _cwe(862, "Missing Authorization")
+CWE_1059 = _cwe(1059, "Insufficient Technical Documentation")
+CWE_1327 = _cwe(1327, "Binding to an Unrestricted IP Address")
+CWE_1427 = _cwe(1427, "Improper Neutralization of Input Used for LLM Prompting")
+
+OWASP_MCP01 = _mcp("01", "Token Mismanagement & Secret Exposure")
+OWASP_MCP02 = _mcp("02", "Privilege Escalation via Scope Creep")
+OWASP_MCP03 = _mcp("03", "Tool Poisoning")
+OWASP_MCP04 = _mcp("04", "Software Supply Chain Attacks & Dependency Tampering")
+OWASP_MCP05 = _mcp("05", "Command Injection & Execution")
+OWASP_MCP06 = _mcp("06", "Prompt Injection via Contextual Payloads")
+OWASP_MCP07 = _mcp("07", "Insufficient Authentication & Authorization")
+OWASP_MCP09 = _mcp("09", "Shadow MCP Servers")
+OWASP_MCP10 = _mcp("10", "Context Injection & Over-Sharing")
+
+OWASP_LLM01 = _llm("01", "Prompt Injection")
+OWASP_LLM02 = _llm("02", "Sensitive Information Disclosure")
+OWASP_LLM03 = _llm("03", "Supply Chain")
+OWASP_LLM06 = _llm("06", "Excessive Agency")
+
+
 @dataclass(frozen=True)
 class RuleMeta:
     id: str
@@ -70,6 +138,7 @@ class RuleMeta:
     mitigation: str
     limitations: str
     references: tuple[Reference, ...] = field(default_factory=tuple)
+    standards: tuple[Standard, ...] = field(default_factory=tuple)  # CWE / OWASP identifiers
     spec_note: str | None = None
     detection: str = ""  # human-readable summary of the detection logic
 
@@ -102,6 +171,7 @@ _add(
         "because most clients spawn without a shell, but a client that does use one would make them "
         "live.",
         references=(REF_LOCAL_COMPROMISE,),
+        standards=(CWE_78, OWASP_MCP05),
         detection="`command` basename is a shell; `-c`/`/c`/`-Command`/`-EncodedCommand` present; "
         "payload inspected for `&&`, `;`, `|`, `$(`, backticks, redirections.",
     )
@@ -127,6 +197,7 @@ _add(
         "and may flag opaque identifiers that are not secrets. Low-entropy passwords without a "
         "recognisable key name are missed.",
         references=(REF_OWASP_SECRETS, REF_TOKEN_PASSTHROUGH),
+        standards=(CWE_798, CWE_312, OWASP_MCP01, OWASP_LLM02),
         detection="Literal `env`, `headers`, URL userinfo/query and argv values matched against known "
         "token prefixes (high confidence), then secret-like key names (medium), then high-entropy "
         "strings (low). `${...}` references and placeholders are excluded. Output is always "
@@ -153,6 +224,7 @@ _add(
         "flags, environment variables, and Docker volume mounts. A server that exposes paths through an "
         "unrecognised mechanism is missed. Windows paths are matched as strings, not resolved.",
         references=(REF_LOCAL_COMPROMISE, REF_SCOPE_MIN),
+        standards=(CWE_250, CWE_284, OWASP_MCP02, OWASP_LLM06),
         detection="Collect directory arguments; flag filesystem roots and drive roots (High), home "
         "directories and system directories (Medium), and credential directories such as `~/.ssh` "
         "or `~/.aws` (High).",
@@ -176,6 +248,7 @@ _add(
         limitations="Cannot know whether the network path is already protected (VPN, service mesh, SSH "
         "tunnel). Private-range hosts are reported with a note to that effect.",
         references=(REF_STREAMABLE_HTTP, REF_OAUTH21, REF_AUTHZ),
+        standards=(CWE_319, CWE_523, OWASP_MCP01, OWASP_MCP07),
         spec_note="Loopback exception per OAuth 2.1 §1.5 and MCP Security Best Practices (SSRF "
         "section: 'Reject http:// URLs except for loopback addresses').",
         detection="`url` scheme is `http` or `ws` and host is not loopback. Severity raised to High "
@@ -201,6 +274,7 @@ _add(
         limitations="Approval keys are client-specific (`autoApprove`, `alwaysAllow`, `trust`); other "
         "clients configure approval outside the server entry and are not visible here.",
         references=(REF_TOOLS_UI, REF_INVARIANT),
+        standards=(CWE_862, OWASP_MCP02, OWASP_LLM06),
         detection="Server entry contains `autoApprove`/`alwaysAllow` with entries, or `trust: true`. "
         "Wildcard (`*`, `true`) raises severity to High.",
     )
@@ -226,6 +300,7 @@ _add(
         "imperative language, and a determined attacker can paraphrase or write in another "
         "language. Static analysis cannot determine whether a tool is malicious.",
         references=(REF_INVARIANT, REF_OWASP_MCP03, REF_CSA, REF_TOOLS),
+        standards=(CWE_1427, OWASP_MCP03, OWASP_MCP06, OWASP_LLM01),
         detection="All strings in description, title, parameter descriptions, enum/default values and "
         "output schema are matched against six signal classes: model-directed imperatives, "
         "concealment from the user, pseudo system tags, sensitive file references, exfiltration "
@@ -250,6 +325,7 @@ _add(
         limitations="Any legitimate update also triggers this finding — that is the intended behaviour. "
         "Comparison is offline between two snapshots; it does not observe live changes.",
         references=(REF_INVARIANT, REF_CSA, REF_TOOLS),
+        standards=(CWE_345, CWE_829, OWASP_MCP03, OWASP_MCP04, OWASP_LLM03),
         spec_note="MCP 2026-07-28 Tools spec: the tool set 'MAY change over time'; clients subscribed "
         "via subscriptions/listen receive notifications/tools/list_changed.",
         detection="SHA-256 over the canonical JSON of {name,title,description,inputSchema,outputSchema,"
@@ -295,6 +371,7 @@ _add(
         limitations="Pinning limits drift; it does not vouch for the pinned version. Lockfiles outside "
         "the config file are not consulted. Only well-known launchers are recognised.",
         references=(REF_LOCAL_COMPROMISE, REF_CSA),
+        standards=(CWE_829, CWE_494, OWASP_MCP04, OWASP_LLM03),
         detection="`command` is npx/bunx/pnpm dlx/uvx/pipx run; the package argument has no exact "
         "version (no `@x.y.z`/`==x.y.z`, or a range/tag such as `latest`, `^`, `>=`).",
     )
@@ -316,6 +393,7 @@ _add(
         limitations="Directory conventions are platform-specific heuristics; a legitimate development "
         "setup may run from these locations.",
         references=(REF_LOCAL_COMPROMISE,),
+        standards=(CWE_829, OWASP_MCP05, OWASP_LLM03),
         detection="Command path under /tmp, /var/tmp, Downloads, Temp, or cache dirs; or an interpreter "
         "invoked with `-c`/`-e`/`--eval` and an inline program.",
     )
@@ -337,6 +415,7 @@ _add(
         limitations="Pattern-based; a maintenance script may legitimately use some of these. Obfuscated "
         "variants (string splitting, encoding) are not decoded.",
         references=(REF_LOCAL_COMPROMISE, REF_OWASP_MCP05),
+        standards=(CWE_78, CWE_494, CWE_250, OWASP_MCP05),
         detection="Command line matched for privilege escalation, destructive deletion, download-to-shell, "
         "reverse shells, decode-and-run, and credential paths. Severity by class.",
     )
@@ -358,6 +437,7 @@ _add(
         limitations="Only `docker`/`podman`/`nerdctl run` command lines are inspected; compose files and "
         "runtime defaults are not.",
         references=(REF_LOCAL_COMPROMISE,),
+        standards=(CWE_250, CWE_269, OWASP_MCP02, OWASP_LLM06),
         detection="Flags: --privileged, --network/--net host, --pid host, --ipc host, --userns host, "
         "--cap-add (SYS_ADMIN/ALL/…), --security-opt *unconfined, docker.sock mount, --user root/0.",
     )
@@ -378,6 +458,7 @@ _add(
         mitigation="Remove the variable, or document exactly why the server needs it and what it loads.",
         limitations="Some development setups set these legitimately (module paths, debuggers).",
         references=(REF_LOCAL_COMPROMISE,),
+        standards=(CWE_427, CWE_94, OWASP_MCP05),
         detection="`env` contains a known loader/interpreter hook variable. Preload-style variables "
         "and NODE_OPTIONS with --require/--import are raised to High.",
     )
@@ -398,6 +479,7 @@ _add(
         limitations='Detection relies on `type: "sse"` or a URL ending in `/sse`; a legacy server '
         "behind a different path is missed.",
         references=(REF_STREAMABLE_HTTP, REF_DEPRECATED),
+        standards=(CWE_477, OWASP_MCP07),
         spec_note="Deprecated since 2025-03-26; formally Deprecated under the feature-lifecycle policy "
         "in 2026-07-28 with a twelve-month minimum window.",
         detection="transport resolves to `sse`.",
@@ -419,6 +501,7 @@ _add(
         limitations="Only recognises common host flags/env vars. Inside a container 0.0.0.0 is often "
         "required and the exposure is governed by the port mapping instead.",
         references=(REF_STREAMABLE_HTTP,),
+        standards=(CWE_1327, CWE_668, OWASP_MCP07, OWASP_MCP09),
         detection="`--host`/`--bind`/`-H` or HOST-style env set to 0.0.0.0, ::, or *. High when no "
         "credential-like env/arg is present.",
     )
@@ -438,6 +521,7 @@ _add(
         "is intentionally public, make sure it exposes nothing sensitive.",
         limitations="Cannot observe runtime authorization. Expect this on every OAuth-protected server.",
         references=(REF_AUTHZ, REF_STREAMABLE_HTTP),
+        standards=(CWE_306, OWASP_MCP07),
         detection="Non-loopback `url` with no `headers` and no auth-related keys in the entry.",
     )
 )
@@ -456,6 +540,7 @@ _add(
         limitations="Only within one file. Cross-file precedence (user vs project config) is "
         "client-specific and not evaluated.",
         references=(REF_TOOLS_NAMES,),
+        standards=(CWE_694, OWASP_MCP09),
         detection="Two servers in one file with the same command line or URL.",
     )
 )
@@ -474,6 +559,7 @@ _add(
         limitations="Decided from the parameter's name and description; a parameter literally named "
         "`token` that is not secret is a false positive.",
         references=(REF_TOOLS_XHEADER,),
+        standards=(CWE_200, CWE_522, OWASP_MCP01, OWASP_LLM02),
         spec_note="`x-mcp-header` exists only in MCP 2026-07-28 and later.",
         detection="A statically reachable property with `x-mcp-header` whose name or description "
         "matches secret or PII vocabulary.",
@@ -496,6 +582,7 @@ _add(
         limitations="Length-based signals (padding, outliers) are heuristics; right-to-left languages "
         "and emoji are allowed and not flagged.",
         references=(REF_INVARIANT, REF_CYBERARK, REF_CSA),
+        standards=(CWE_1427, CWE_506, OWASP_MCP03, OWASP_LLM01),
         detection="Zero-width/bidi/tag code points (High confidence); HTML comments; base64/hex runs "
         "≥ 64 chars; whitespace runs ≥ 100; description > 5x the catalogue median and > 2000 chars.",
     )
@@ -517,6 +604,7 @@ _add(
         limitations="Capability is inferred from names and descriptions; `remove_filter` or "
         "`get_updates` can mislead the inference.",
         references=(REF_TOOLS, REF_TOOLS_SECURITY),
+        standards=(CWE_451, OWASP_MCP03, OWASP_LLM06),
         detection="Capability class (exec, write, delete, send) inferred from name tokens, then first "
         "sentence; compared with readOnlyHint/destructiveHint. Missing annotations on a sensitive "
         "tool are reported as Info.",
@@ -540,6 +628,7 @@ _add(
         limitations="Cannot see the server's own validation; a constrained-looking schema can still be "
         "unsafe and a loose one can be validated server-side.",
         references=(REF_TOOLS, REF_OWASP_MCP05),
+        standards=(CWE_20, CWE_1059, OWASP_MCP05, OWASP_LLM06),
         detection="Missing/short description; missing inputSchema; open object; free-form string "
         "parameter named command/cmd/shell/script/sql/query/path/url/code without constraints (Medium).",
     )
@@ -562,6 +651,7 @@ _add(
         limitations="Needs more than one catalogue in the scan. Generic verbs (`search`) collide "
         "innocently; the finding says which servers are involved.",
         references=(REF_TOOLS_NAMES, REF_INVARIANT),
+        standards=(CWE_694, CWE_451, OWASP_MCP03, OWASP_MCP09),
         detection="Exact duplicates across catalogues with different server labels (High); normalised "
         "or confusable-character matches (Medium); duplicates within one catalogue (Low).",
     )
@@ -582,6 +672,7 @@ _add(
         "confirmation on sink tools; sanitise retrieved content.",
         limitations="Surface enumeration only. Static analysis cannot detect prompt injection.",
         references=(REF_TOOLS_SECURITY, REF_INVARIANT),
+        standards=(CWE_1427, CWE_250, OWASP_MCP06, OWASP_MCP10, OWASP_LLM01, OWASP_LLM06),
         detection="`openWorldHint: true` or fetch/search/mail vocabulary → ingress; exec/write/send "
         "vocabulary → sink. One Info finding per catalogue when an ingress tool exists.",
     )
@@ -601,6 +692,7 @@ _add(
         "properties only.",
         limitations="Checks the schema text only.",
         references=(REF_TOOLS_XHEADER,),
+        standards=(CWE_20, OWASP_MCP01),
         spec_note="MCP 2026-07-28.",
         detection="Empty/non-token names; duplicates (case-insensitive); non-primitive or `number` "
         "types; placement under items/oneOf/anyOf/allOf/not/if/then/else/$ref.",
