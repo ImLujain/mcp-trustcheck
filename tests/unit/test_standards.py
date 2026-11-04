@@ -48,8 +48,8 @@ def test_findings_and_renderers_carry_all_standards_and_references() -> None:
     for f in report.findings:
         meta = rules_catalog.RULES[f.rule_id]
         assert [s.id for s in f.standards] == [s.id for s in meta.standards]
-        for s in f.standards:
-            assert s.label in text
+        for s in f.standards:  # identifier and title both printed (title may wrap)
+            assert s.id in text and s.title.split()[0] in text
         for r in f.references:  # every reference, not only the first
             assert r.url in text
     for jf in data["findings"]:

@@ -137,7 +137,7 @@ mcp-trustcheck --version
 
 Exit codes: `0` no finding at or above `--fail-on` (default `high`); `1` at least one such finding; `2` usage error or no scannable input; `3` internal error (traceback only with `-v`). Skipped files never change the exit code.
 
-Terminal output: grouped by file → server/tool, one numbered block per finding with `[SEVERITY/confidence] RULE title`, then aligned `where` / `what` / `evidence` / `fix` / `standards` / `refs` rows; every reference and standard the rule carries is printed. Colour only when stdout is a TTY and `--no-color` is absent; `NO_COLOR` env honoured. `--format json` writes the Report object and nothing else to stdout (or `--output`).
+Terminal output: a summary table (number, severity, confidence, rule, title, where) followed by one detail card per finding — `File` / `Server` or `Tool` / `Path` / `Problem` / `Evidence` / `Fix` / `Standards` / `References` rows in a fixed label column, every value word-wrapped to the terminal width (TTY width clamped to 72–120; fixed 100 when piped). Every reference and standard the rule carries is printed. Colour only when stdout is a TTY and `--no-color` is absent; `NO_COLOR` env honoured. `--format json` writes the Report object and nothing else to stdout (or `--output`).
 
 ---
 

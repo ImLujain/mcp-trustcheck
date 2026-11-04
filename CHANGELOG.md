@@ -11,8 +11,8 @@ Initial MVP.
 - Standards mapping on every rule: CWE identifiers plus OWASP MCP Top 10 (2025) and OWASP Top 10
   for LLM Applications (2025) entries. Carried on each finding (`standards[]`, report schema 1.1),
   in `rules --explain` / `rules --format json`, and in `docs/methodology.md`.
-- Terminal report reorganised: numbered findings with aligned `where` / `what` / `evidence` / `fix` /
-  `standards` / `refs` rows; every reference is printed, not just the first.
+- Terminal report reorganised: a summary table, then one detail card per finding with a fixed label
+  column and text wrapped to the terminal width; every reference is printed, not just the first.
 - `not_recognised` skips now say what structure was looked for.
 - `scan`, `diff` and `rules` commands; terminal and JSON output; deterministic exit codes.
 - 23 checks (15 configuration, 8 tool-definition) with separate severity and confidence, each mapped
