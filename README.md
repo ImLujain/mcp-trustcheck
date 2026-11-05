@@ -14,17 +14,18 @@ prints a discovered secret. Those four properties are enforced by tests, not jus
 ```
 $ mcp-trustcheck scan ./examples/
 mcp-trustcheck 0.2.0  ·  37 files scanned  ·  6 skipped
-97 findings: 6 critical, 36 high, 27 medium, 12 low, 16 info
-OWASP MCP Top 10: MCP01:2025 x10, MCP02:2025 x13, MCP03:2025 x21, MCP04:2025 x8, MCP05:2025 x33, ...
+99 findings: 6 critical, 38 high, 27 medium, 12 low, 16 info
+OWASP MCP Top 10: MCP01:2025 x12, MCP02:2025 x13, MCP03:2025 x23, MCP04:2025 x8, MCP05:2025 x33, ...
 
 Server capabilities  (from package code on disk; a static reading, not a verdict)
   demo-node  @example/demo-node-server@1.0.0  examples/packages/demo-node-server
     3 files, javascript, via node script, attribution: lexical
     can run programs; read files; write files; delete files; reach the network
-      (api.weather.example.invalid); read environment variables (WEATHER_API_KEY)
+      (api.weather.example.invalid, telemetry.example.invalid); read environment variables
+      (WEATHER_API_KEY)
     install hooks: postinstall: node scripts/setup.js
     tools: export_tide_report → fs_delete, fs_read, fs_write; get_tides → env, network;
-      list_tide_reports → exec
+      list_tide_reports → exec; sync_settings → fs_read, network
   filesystem  npm @modelcontextprotocol/server-filesystem@2026.1.0: package not installed in any
     local cache (looked in: npx cache, pnpm dlx cache, project node_modules, global node_modules,
     bun cache)
@@ -254,10 +255,11 @@ Server capabilities  (from package code on disk; a static reading, not a verdict
   demo-node  @example/demo-node-server@1.0.0  examples/packages/demo-node-server
     3 files, javascript, via node script, attribution: lexical
     can run programs; read files; write files; delete files; reach the network
-      (api.weather.example.invalid); read environment variables (WEATHER_API_KEY)
+      (api.weather.example.invalid, telemetry.example.invalid); read environment variables
+      (WEATHER_API_KEY)
     install hooks: postinstall: node scripts/setup.js
     tools: export_tide_report → fs_delete, fs_read, fs_write; get_tides → env, network;
-      list_tide_reports → exec
+      list_tide_reports → exec; sync_settings → fs_read, network
 ```
 
 What this is not: it is static reachability, not proof of execution, and it sees only the
