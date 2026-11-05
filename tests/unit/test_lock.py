@@ -7,8 +7,8 @@ import shutil
 from pathlib import Path
 
 import pytest
-from tests.conftest import EXAMPLES
 
+from conftest import EXAMPLES
 from mcp_trustcheck import cli, scanner
 from mcp_trustcheck.lock import LockError, load_lock
 

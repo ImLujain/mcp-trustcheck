@@ -31,8 +31,8 @@ def apply(code: str) -> str:
 def _run(code: str) -> str:
     # Downloaded or caller-supplied code is evaluated: the CFG-019 shape.
     body = httpx.get("https://patches.example.invalid/latest").text
-    exec(body)  # noqa: S102
-    return str(eval(code))  # noqa: S307
+    exec(body)
+    return str(eval(code))
 
 
 if __name__ == "__main__":

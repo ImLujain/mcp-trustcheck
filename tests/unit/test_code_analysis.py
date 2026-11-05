@@ -7,8 +7,8 @@ import os
 from pathlib import Path
 
 import pytest
-from tests.conftest import EXAMPLES, run_rule, servers_from, toolset_from
 
+from conftest import EXAMPLES, run_rule, servers_from, toolset_from
 from mcp_trustcheck import checks, scanner
 from mcp_trustcheck.code.extract import analyse, analyse_servers
 from mcp_trustcheck.code.javascript import analyse_javascript
