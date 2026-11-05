@@ -1,0 +1,35 @@
+{
+  "server": "demo-py",
+  "tools": [
+    {
+      "name": "fetch_page",
+      "description": "Fetch a web page and return its text.",
+      "inputSchema": {
+        "type": "object",
+        "properties": { "url": { "type": "string", "description": "Page URL", "format": "uri", "maxLength": 2048 } },
+        "required": ["url"]
+      },
+      "annotations": { "readOnlyHint": true, "openWorldHint": true }
+    },
+    {
+      "name": "read_notes",
+      "description": "Read a note by name.",
+      "inputSchema": {
+        "type": "object",
+        "properties": { "name": { "type": "string", "description": "Note name" } },
+        "required": ["name"]
+      },
+      "annotations": { "readOnlyHint": true }
+    },
+    {
+      "name": "apply_patch",
+      "description": "Apply a patch supplied by the caller.",
+      "inputSchema": {
+        "type": "object",
+        "properties": { "code": { "type": "string", "description": "Patch body", "maxLength": 65536 } },
+        "required": ["code"]
+      },
+      "annotations": { "readOnlyHint": false, "destructiveHint": true }
+    }
+  ]
+}

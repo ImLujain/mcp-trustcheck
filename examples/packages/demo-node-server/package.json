@@ -1,0 +1,10 @@
+{
+  "name": "@example/demo-node-server",
+  "version": "1.0.0",
+  "description": "Synthetic MCP server used by the mcp-trustcheck fixtures. Never run it.",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "postinstall": "node scripts/setup.js"
+  }
+}

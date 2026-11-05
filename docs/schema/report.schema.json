@@ -5,37 +5,86 @@
   "description": "Machine-readable output of `mcp-trustcheck scan --format json`. All evidence snippets are redacted before serialisation.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema_version", "tool", "generated_at", "scan", "summary", "findings"],
+  "required": [
+    "schema_version",
+    "tool",
+    "generated_at",
+    "scan",
+    "summary",
+    "findings",
+    "packages"
+  ],
   "properties": {
-    "schema_version": { "const": "1.1" },
+    "schema_version": {
+      "const": "1.2"
+    },
     "tool": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["name", "version"],
+      "required": [
+        "name",
+        "version"
+      ],
       "properties": {
-        "name": { "const": "mcp-trustcheck" },
-        "version": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+" }
+        "name": {
+          "const": "mcp-trustcheck"
+        },
+        "version": {
+          "type": "string",
+          "pattern": "^\\d+\\.\\d+\\.\\d+"
+        }
       }
     },
-    "generated_at": { "type": "string", "format": "date-time" },
+    "generated_at": {
+      "type": "string",
+      "format": "date-time"
+    },
     "scan": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["inputs", "files_scanned", "files_skipped", "rules_run"],
+      "required": [
+        "inputs",
+        "files_scanned",
+        "files_skipped",
+        "rules_run"
+      ],
       "properties": {
-        "inputs": { "type": "array", "items": { "type": "string" } },
+        "inputs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
         "files_scanned": {
           "type": "array",
           "items": {
             "type": "object",
             "additionalProperties": false,
-            "required": ["path", "kind"],
+            "required": [
+              "path",
+              "kind"
+            ],
             "properties": {
-              "path": { "type": "string" },
-              "kind": { "enum": ["config", "tools"] },
-              "dialect": { "type": "string" },
-              "servers": { "type": "integer", "minimum": 0 },
-              "tools": { "type": "integer", "minimum": 0 }
+              "path": {
+                "type": "string"
+              },
+              "kind": {
+                "enum": [
+                  "config",
+                  "tools"
+                ]
+              },
+              "dialect": {
+                "type": "string"
+              },
+              "servers": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "tools": {
+                "type": "integer",
+                "minimum": 0
+              }
             }
           }
         },
@@ -44,148 +93,675 @@
           "items": {
             "type": "object",
             "additionalProperties": false,
-            "required": ["path", "reason"],
+            "required": [
+              "path",
+              "reason"
+            ],
             "properties": {
-              "path": { "type": "string" },
+              "path": {
+                "type": "string"
+              },
               "reason": {
                 "enum": [
-                  "not_recognised", "invalid_json", "too_large", "binary",
-                  "symlink_outside_root", "unreadable", "too_deep", "empty",
-                  "not_regular_file", "too_many_files"
+                  "not_recognised",
+                  "invalid_json",
+                  "too_large",
+                  "binary",
+                  "symlink_outside_root",
+                  "unreadable",
+                  "too_deep",
+                  "empty",
+                  "not_regular_file",
+                  "too_many_files"
                 ]
               },
-              "detail": { "type": "string" }
+              "detail": {
+                "type": "string"
+              }
             }
           }
         },
-        "rules_run": { "type": "array", "items": { "$ref": "#/$defs/rule_id" } },
-        "baseline": { "type": ["string", "null"] },
+        "rules_run": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/rule_id"
+          }
+        },
+        "baseline": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "errors": {
           "type": "array",
           "items": {
             "type": "object",
             "additionalProperties": false,
-            "required": ["rule_id", "file", "message"],
+            "required": [
+              "rule_id",
+              "file",
+              "message"
+            ],
             "properties": {
-              "rule_id": { "$ref": "#/$defs/rule_id" },
-              "file": { "type": "string" },
-              "message": { "type": "string", "maxLength": 300 }
+              "rule_id": {
+                "$ref": "#/$defs/rule_id"
+              },
+              "file": {
+                "type": "string"
+              },
+              "message": {
+                "type": "string",
+                "maxLength": 300
+              }
             }
           }
+        },
+        "lock": {
+          "type": [
+            "string",
+            "null"
+          ]
         }
       }
     },
     "summary": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["total", "by_severity", "by_confidence", "by_kind"],
+      "required": [
+        "total",
+        "by_severity",
+        "by_confidence",
+        "by_kind",
+        "by_standard"
+      ],
       "properties": {
-        "total": { "type": "integer", "minimum": 0 },
+        "total": {
+          "type": "integer",
+          "minimum": 0
+        },
         "by_severity": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["critical", "high", "medium", "low", "info"],
+          "required": [
+            "critical",
+            "high",
+            "medium",
+            "low",
+            "info"
+          ],
           "properties": {
-            "critical": { "type": "integer", "minimum": 0 },
-            "high": { "type": "integer", "minimum": 0 },
-            "medium": { "type": "integer", "minimum": 0 },
-            "low": { "type": "integer", "minimum": 0 },
-            "info": { "type": "integer", "minimum": 0 }
+            "critical": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "high": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "medium": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "low": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "info": {
+              "type": "integer",
+              "minimum": 0
+            }
           }
         },
         "by_confidence": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["high", "medium", "low"],
+          "required": [
+            "high",
+            "medium",
+            "low"
+          ],
           "properties": {
-            "high": { "type": "integer", "minimum": 0 },
-            "medium": { "type": "integer", "minimum": 0 },
-            "low": { "type": "integer", "minimum": 0 }
+            "high": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "medium": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "low": {
+              "type": "integer",
+              "minimum": 0
+            }
           }
         },
         "by_kind": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["weakness", "indicator", "info"],
+          "required": [
+            "weakness",
+            "indicator",
+            "info"
+          ],
           "properties": {
-            "weakness": { "type": "integer", "minimum": 0 },
-            "indicator": { "type": "integer", "minimum": 0 },
-            "info": { "type": "integer", "minimum": 0 }
+            "weakness": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "indicator": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "info": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        },
+        "by_standard": {
+          "description": "Findings per cited standard identifier (CWE, OWASP MCP Top 10, OWASP LLM Top 10).",
+          "type": "object",
+          "propertyNames": {
+            "pattern": "^(CWE-[0-9]+|MCP[0-9]{2}:2025|LLM[0-9]{2}:2025)$"
+          },
+          "additionalProperties": {
+            "type": "integer",
+            "minimum": 0
           }
         }
       }
     },
-    "findings": { "type": "array", "items": { "$ref": "#/$defs/finding" } }
+    "findings": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/finding"
+      }
+    },
+    "packages": {
+      "description": "One entry per configured server: the capability manifest derived from its package code on disk, or why the code was not located. Nothing is executed or fetched.",
+      "type": "array",
+      "items": {
+        "oneOf": [
+          {
+            "$ref": "#/$defs/package_manifest"
+          },
+          {
+            "$ref": "#/$defs/package_not_located"
+          }
+        ]
+      }
+    }
   },
   "$defs": {
-    "rule_id": { "type": "string", "pattern": "^(CFG|TOOL)-\\d{3}$" },
-    "severity": { "enum": ["critical", "high", "medium", "low", "info"] },
-    "confidence": { "enum": ["high", "medium", "low"] },
-    "kind": { "enum": ["weakness", "indicator", "info"] },
+    "rule_id": {
+      "type": "string",
+      "pattern": "^(CFG|TOOL)-\\d{3}$"
+    },
+    "severity": {
+      "enum": [
+        "critical",
+        "high",
+        "medium",
+        "low",
+        "info"
+      ]
+    },
+    "confidence": {
+      "enum": [
+        "high",
+        "medium",
+        "low"
+      ]
+    },
+    "kind": {
+      "enum": [
+        "weakness",
+        "indicator",
+        "info"
+      ]
+    },
     "reference": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["title", "url"],
+      "required": [
+        "title",
+        "url"
+      ],
       "properties": {
-        "title": { "type": "string", "minLength": 1 },
-        "url": { "type": "string", "pattern": "^https://" }
+        "title": {
+          "type": "string",
+          "minLength": 1
+        },
+        "url": {
+          "type": "string",
+          "pattern": "^https://"
+        }
       }
     },
     "standard": {
       "description": "A citable identifier the rule maps to: a CWE weakness, an OWASP MCP Top 10 (2025) risk or an OWASP Top 10 for LLM Applications (2025) risk.",
       "type": "object",
       "additionalProperties": false,
-      "required": ["framework", "id", "title", "url"],
+      "required": [
+        "framework",
+        "id",
+        "title",
+        "url"
+      ],
       "properties": {
-        "framework": { "enum": ["CWE", "OWASP MCP Top 10", "OWASP LLM Top 10"] },
-        "id": { "type": "string", "pattern": "^(CWE-[0-9]+|MCP[0-9]{2}:2025|LLM[0-9]{2}:2025)$" },
-        "title": { "type": "string", "minLength": 1 },
-        "url": { "type": "string", "pattern": "^https://" }
+        "framework": {
+          "enum": [
+            "CWE",
+            "OWASP MCP Top 10",
+            "OWASP LLM Top 10"
+          ]
+        },
+        "id": {
+          "type": "string",
+          "pattern": "^(CWE-[0-9]+|MCP[0-9]{2}:2025|LLM[0-9]{2}:2025)$"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1
+        },
+        "url": {
+          "type": "string",
+          "pattern": "^https://"
+        }
       }
     },
     "evidence": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["json_path", "snippet"],
+      "required": [
+        "json_path",
+        "snippet"
+      ],
       "properties": {
-        "json_path": { "type": "string", "pattern": "^\\$" },
-        "snippet": { "type": "string", "maxLength": 512 },
-        "note": { "type": "string" }
+        "json_path": {
+          "type": "string",
+          "pattern": "^\\$"
+        },
+        "snippet": {
+          "type": "string",
+          "maxLength": 512
+        },
+        "note": {
+          "type": "string"
+        }
       }
     },
     "finding": {
       "type": "object",
       "additionalProperties": false,
       "required": [
-        "id", "rule_id", "title", "description", "kind", "severity", "confidence",
-        "affected", "evidence", "impact", "mitigation", "references", "standards", "limitations"
+        "id",
+        "rule_id",
+        "title",
+        "description",
+        "kind",
+        "severity",
+        "confidence",
+        "affected",
+        "evidence",
+        "impact",
+        "mitigation",
+        "references",
+        "standards",
+        "limitations"
       ],
       "properties": {
-        "id": { "type": "string", "pattern": "^(CFG|TOOL)-\\d{3}-[0-9a-f]{8}$" },
-        "rule_id": { "$ref": "#/$defs/rule_id" },
-        "title": { "type": "string", "minLength": 1, "maxLength": 120 },
-        "description": { "type": "string", "minLength": 1 },
-        "kind": { "$ref": "#/$defs/kind" },
-        "severity": { "$ref": "#/$defs/severity" },
-        "confidence": { "$ref": "#/$defs/confidence" },
+        "id": {
+          "type": "string",
+          "pattern": "^(CFG|TOOL)-\\d{3}-[0-9a-f]{8}$"
+        },
+        "rule_id": {
+          "$ref": "#/$defs/rule_id"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1
+        },
+        "kind": {
+          "$ref": "#/$defs/kind"
+        },
+        "severity": {
+          "$ref": "#/$defs/severity"
+        },
+        "confidence": {
+          "$ref": "#/$defs/confidence"
+        },
         "affected": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["file", "json_path"],
+          "required": [
+            "file",
+            "json_path"
+          ],
           "properties": {
-            "file": { "type": "string" },
-            "server": { "type": "string" },
-            "tool": { "type": "string" },
-            "json_path": { "type": "string", "pattern": "^\\$" }
+            "file": {
+              "type": "string"
+            },
+            "server": {
+              "type": "string"
+            },
+            "tool": {
+              "type": "string"
+            },
+            "json_path": {
+              "type": "string",
+              "pattern": "^\\$"
+            }
           }
         },
-        "evidence": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/evidence" } },
-        "impact": { "type": "string", "minLength": 1 },
-        "mitigation": { "type": "string", "minLength": 1 },
-        "references": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/reference" } },
-        "standards": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/standard" } },
-        "limitations": { "type": "string", "minLength": 1 },
-        "spec_note": { "type": "string" }
+        "evidence": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/evidence"
+          }
+        },
+        "impact": {
+          "type": "string",
+          "minLength": 1
+        },
+        "mitigation": {
+          "type": "string",
+          "minLength": 1
+        },
+        "references": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/reference"
+          }
+        },
+        "standards": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/standard"
+          }
+        },
+        "limitations": {
+          "type": "string",
+          "minLength": 1
+        },
+        "spec_note": {
+          "type": "string"
+        }
+      }
+    },
+    "capability_class": {
+      "enum": [
+        "exec",
+        "fs_read",
+        "fs_write",
+        "fs_delete",
+        "network",
+        "env",
+        "dynamic_code",
+        "native"
+      ]
+    },
+    "sink": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "class",
+        "file",
+        "line",
+        "callee"
+      ],
+      "properties": {
+        "class": {
+          "$ref": "#/$defs/capability_class"
+        },
+        "file": {
+          "type": "string"
+        },
+        "line": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "callee": {
+          "type": "string"
+        },
+        "detail": {
+          "type": "string"
+        },
+        "snippet": {
+          "type": "string",
+          "maxLength": 200
+        }
+      }
+    },
+    "package_manifest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "server",
+        "source_file",
+        "json_path",
+        "ecosystem",
+        "name",
+        "version",
+        "root",
+        "located_by",
+        "language",
+        "files_scanned",
+        "bytes_scanned",
+        "digest",
+        "attribution",
+        "classes",
+        "hosts",
+        "env",
+        "summary",
+        "sinks",
+        "tools",
+        "declared_tools",
+        "install_hooks",
+        "notes"
+      ],
+      "properties": {
+        "status": {
+          "const": "analysed"
+        },
+        "server": {
+          "type": "string"
+        },
+        "source_file": {
+          "type": "string"
+        },
+        "json_path": {
+          "type": "string",
+          "pattern": "^\\$"
+        },
+        "ecosystem": {
+          "enum": [
+            "npm",
+            "pypi",
+            "path"
+          ]
+        },
+        "name": {
+          "type": "string"
+        },
+        "version": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "root": {
+          "type": "string"
+        },
+        "located_by": {
+          "type": "string"
+        },
+        "language": {
+          "enum": [
+            "python",
+            "javascript",
+            "mixed",
+            "none"
+          ]
+        },
+        "files_scanned": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "bytes_scanned": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "digest": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "attribution": {
+          "enum": [
+            "ast",
+            "lexical",
+            "none"
+          ]
+        },
+        "classes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/capability_class"
+          }
+        },
+        "hosts": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "env": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "summary": {
+          "type": "string"
+        },
+        "sinks": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/sink"
+          }
+        },
+        "tools": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "name",
+              "handler",
+              "classes",
+              "sinks"
+            ],
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "handler": {
+                "type": "string"
+              },
+              "classes": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/capability_class"
+                }
+              },
+              "sinks": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/sink"
+                }
+              }
+            }
+          }
+        },
+        "declared_tools": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "install_hooks": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "notes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "package_not_located": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "server",
+        "source_file",
+        "json_path",
+        "ecosystem",
+        "spec",
+        "reason",
+        "searched"
+      ],
+      "properties": {
+        "status": {
+          "const": "not_located"
+        },
+        "server": {
+          "type": "string"
+        },
+        "source_file": {
+          "type": "string"
+        },
+        "json_path": {
+          "type": "string",
+          "pattern": "^\\$"
+        },
+        "ecosystem": {
+          "enum": [
+            "npm",
+            "pypi",
+            "path",
+            "container",
+            "remote",
+            "unknown"
+          ]
+        },
+        "spec": {
+          "type": "string"
+        },
+        "reason": {
+          "type": "string"
+        },
+        "searched": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
       }
     }
   }

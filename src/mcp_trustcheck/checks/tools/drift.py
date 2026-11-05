@@ -7,7 +7,7 @@ import json
 import unicodedata
 from typing import Any
 
-from mcp_trustcheck.checks import Context, emit, register
+from mcp_trustcheck.checks import Context, emit, norm_label, register
 from mcp_trustcheck.model import (
     Affected,
     Confidence,
@@ -54,12 +54,17 @@ def _first_diff(a: str, b: str, width: int = 50) -> str:
 
 @register("TOOL-006", "tools")
 def check_baseline_drift(toolset: ToolSet, ctx: Context) -> list[Finding]:
-    if ctx.baseline is None:
+    baseline = ctx.baseline
+    baseline_note = f"baseline: {ctx.baseline_path}" if ctx.baseline_path else "baseline"
+    if baseline is None:
+        # a lock file carries one approved catalogue per server (docs/design.md §8)
+        baseline = ctx.baselines.get(norm_label(toolset.server_label))
+        baseline_note = f"lock: {ctx.lock_path}" if ctx.lock_path else "lock"
+    if baseline is None:
         return []
-    base = {t.name: t for t in ctx.baseline.tools}
+    base = {t.name: t for t in baseline.tools}
     cur = {t.name: t for t in toolset.tools}
     findings: list[Finding] = []
-    baseline_note = f"baseline: {ctx.baseline_path}" if ctx.baseline_path else "baseline"
 
     for name, tool in cur.items():
         old = base.get(name)

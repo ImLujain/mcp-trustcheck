@@ -49,8 +49,9 @@ def test_findings_match_oracle(report, expected) -> None:  # type: ignore[no-unt
 
 def test_every_rule_has_a_positive_and_negative_fixture(report, expected) -> None:  # type: ignore[no-untyped-def]
     triggered = {f.rule_id for f in report.findings}
-    # TOOL-006 needs --baseline; it is covered by test_diff_command_detects_drift.
-    assert triggered == set(report.rules_run) - {"TOOL-006"}
+    # TOOL-006 needs --baseline and CFG-020 needs --lock; test_diff_command_detects_drift and
+    # tests/unit/test_lock.py cover them.
+    assert triggered == set(report.rules_run) - scanner.LOCK_RULES
     assert any(f.kind.value == "weakness" for f in report.findings)
     negatives = [s.path for s in report.files_scanned if "/negative/" in s.path]
     assert len(negatives) >= 8

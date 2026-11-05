@@ -219,3 +219,82 @@ Design rules:
 1. **License** — Apache-2.0 (confirmed in Phase 6).
 2. **Distribution name** — renamed from the working name `mcp-audit` to `mcp-trustcheck` in Phase 6 after discovering the `mcp-audit` command is already installed by `mcp-audit-scanner`.
 3. **Windows paths** in CFG-006 (`C:\`, `%USERPROFILE%`) — handled as string patterns, not resolved; noted as limitation.
+
+---
+
+## 8. Package code analysis (0.2.0)
+
+### 8.1 Why
+
+Sections 1–7 judge a server by what it *says*: the launch line and the tool catalogue. Both are
+attacker-authored. 0.2.0 adds what the server *is*: the code the launcher would run, which the
+client has already installed on disk. The guarantees of §6 are unchanged — nothing is executed,
+nothing is fetched, nothing is written — because the code is only ever *read* from where the
+client's own launcher put it.
+
+### 8.2 Locating code (`code/locate.py`)
+
+| Launch shape | Where the code is read from |
+|---|---|
+| `npx` / `bunx` / `pnpm dlx` / `yarn dlx` `<pkg>` | `~/.npm/_npx/*/node_modules/<pkg>`, `~/.bun/install/cache/<pkg>@<ver>`, pnpm `dlx` cache, project `node_modules`, global `node_modules` (`npm_config_prefix`, nvm, Homebrew, `NODE_PATH`) |
+| `uvx` / `pipx run` `<dist>` | uv `archive-v*` cache and tool dirs, pipx venvs, `$VIRTUAL_ENV`, `.venv` near the config — matched by `<dist>-<ver>.dist-info`, members from `top_level.txt` / `RECORD` |
+| `node x.js`, `python x.py`, `uv run x.py`, `command: ./x.py` | the script, resolved against the config's directory then the CWD; package root = the nearest ancestor (≤ 2 levels) with `package.json` / `pyproject.toml` / `setup.py` |
+| `--package-path SERVER=DIR` | exactly that directory or file |
+| `docker run …`, remote `url`, `${…}` package names | not located; the report says why |
+
+An exact version in the config is preferred; otherwise the newest cache entry is used and the
+mismatch is stated in `located_by`.
+
+### 8.3 Capability manifest (`code/model.py`, `code/extract.py`)
+
+A manifest is a list of *sinks* — `(class, file, line, callee, detail)` — in eight classes:
+`exec`, `fs_read`, `fs_write`, `fs_delete`, `network` (detail: host), `env` (detail: variable
+name), `dynamic_code`, `native`. Plus: install hooks (`package.json` `preinstall`/`install`/
+`postinstall`/`prepare`, `setup.py` `cmdclass`), a content digest (SHA-256 over every file read),
+declared tool names and per-tool capabilities.
+
+- **Python** (`code/python.py`): `ast`. Callees are resolved through the module's imports, so
+  `import subprocess as sp; sp.run(…)` is `subprocess.run`. Handlers: `@x.tool(name=…)`,
+  `x.add_tool(fn)`, `@x.call_tool()` dispatchers whose `if name == "…"` / `match` arms become
+  per-tool pseudo-functions, `{"name": handler}` tables.
+- **JavaScript / TypeScript** (`code/javascript.py`): no parser in the standard library, so comments,
+  strings, template literals and regex literals are masked (offsets preserved) and sinks are matched
+  only when the file binds the module (`child_process`, `fs`, network libraries, `vm`, `dotenv`, …)
+  or uses a global (`fetch`, `eval`, `new Function`, `process.env`, `Deno.*`, `Bun.*`). Handlers:
+  the argument range of `server.tool("name", …)` / `registerTool`, `case "name":` arms of a
+  `switch (name)`, `if (name === "name") {…}` blocks.
+- **Attribution** follows calls through the package's own functions (depth ≤ 6) and is labelled
+  `ast`, `lexical` or `none`. Minified files are noted and lower the confidence of TOOL-012.
+
+Bounds: 3 000 files, 1 MiB per file, 40 MiB total; `node_modules`, tests, `.d.ts`, source maps and
+minified bundles are skipped or noted. Snippets pass through the secret patterns of `redaction.py`
+and the scan's `Redactor` before they are stored.
+
+### 8.4 Rules
+
+`CFG-018` install hook, `CFG-019` runtime code loading, `CFG-020` drift against the lock,
+`TOOL-012` catalogue claim versus handler code. Catalogues are matched to manifests by normalised
+server label (`demo-node` ≡ `Demo Node` ≡ `demo_node`) or by the package's last name segment.
+
+### 8.5 Lock (`lock.py`)
+
+```
+{ "lock_version": 1, "tool": {…}, "generated_at": …,
+  "servers": { "<name>": {
+      "source_file", "launch",
+      "package": { "ecosystem", "name", "version", "root", "digest", "files_scanned", "attribution" } | null,
+      "capabilities": { "package": [class…], "tools": { "<tool>": [class…] } },
+      "install_hooks": { "<script>": "<command>" },
+      "catalogue": { "source_file", "tools": { "<tool>": { "digest", "raw": {canonical fields} } } } | null
+  } } }
+```
+
+`mcp-trustcheck lock <paths>` writes it (default `mcp-trustcheck.lock.json`); `verify <paths>`
+runs CFG-020 and TOOL-006 only; `scan --lock FILE` runs everything. The root key `lock_version`
+matches no config or catalogue shape, so a lock left beside a config is skipped, never mis-read.
+
+### 8.6 Report
+
+Schema 1.2 adds `scan.lock`, `summary.by_standard` (findings per CWE / OWASP identifier) and a
+top-level `packages` array with one `analysed` manifest or `not_located` record per server. The
+terminal report prints a *Server capabilities* block before the findings table.

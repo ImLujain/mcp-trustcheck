@@ -9,6 +9,7 @@ from collections.abc import Sequence
 from pathlib import Path
 
 from mcp_trustcheck import __version__, rules_catalog, scanner
+from mcp_trustcheck.lock import DEFAULT_LOCK_NAME, write_lock
 from mcp_trustcheck.model import Confidence, Report, Severity
 from mcp_trustcheck.report.json import render_json
 from mcp_trustcheck.report.terminal import render_terminal, use_colour
@@ -34,10 +35,29 @@ def build_parser() -> argparse.ArgumentParser:
         p.add_argument("--output", metavar="FILE", help="write the report here instead of stdout")
         p.add_argument("--no-color", action="store_true")
 
+    def add_packages(p: argparse.ArgumentParser) -> None:
+        p.add_argument(
+            "--package-path",
+            action="append",
+            default=[],
+            metavar="SERVER=DIR",
+            help="read this server's code from DIR instead of searching local launcher caches",
+        )
+        p.add_argument(
+            "--no-packages",
+            action="store_true",
+            help="do not read any package code (CFG-018/019/020 and TOOL-012 will not run)",
+        )
+
     scan = sub.add_parser("scan", help="scan files or directories")
     scan.add_argument("paths", nargs="+")
     add_output(scan, ["terminal", "json", "both"])
     scan.add_argument("--baseline", metavar="FILE", help="approved tool catalogue for TOOL-006")
+    scan.add_argument(
+        "--lock",
+        metavar="FILE",
+        help="lock written by `lock`; enables CFG-020 and per-server TOOL-006",
+    )
     scan.add_argument("--fail-on", choices=_SEV_CHOICES, default="high")
     scan.add_argument("--min-confidence", choices=[c.value for c in Confidence], default="low")
     scan.add_argument("--rules", metavar="ID,ID", help="only run these rules")
@@ -47,7 +67,34 @@ def build_parser() -> argparse.ArgumentParser:
         "--max-file-size", type=int, default=scanner.DEFAULT_MAX_BYTES, metavar="BYTES"
     )
     scan.add_argument("--max-files", type=int, default=scanner.DEFAULT_MAX_FILES, metavar="N")
+    add_packages(scan)
     scan.add_argument("-v", "--verbose", action="store_true")
+
+    lock = sub.add_parser(
+        "lock",
+        help="record the reviewed state (package version, content digest, capabilities, catalogue)",
+    )
+    lock.add_argument("paths", nargs="+")
+    lock.add_argument(
+        "--lock-file",
+        metavar="FILE",
+        default=DEFAULT_LOCK_NAME,
+        help=f"default: {DEFAULT_LOCK_NAME}",
+    )
+    lock.add_argument("--follow-symlinks", action="store_true")
+    add_packages(lock)
+    lock.add_argument("-v", "--verbose", action="store_true")
+
+    verify = sub.add_parser("verify", help="report what changed since the lock (CFG-020, TOOL-006)")
+    verify.add_argument("paths", nargs="+")
+    verify.add_argument(
+        "--lock", metavar="FILE", default=DEFAULT_LOCK_NAME, help=f"default: {DEFAULT_LOCK_NAME}"
+    )
+    add_output(verify, ["terminal", "json", "both"])
+    verify.add_argument("--fail-on", choices=_SEV_CHOICES, default="high")
+    verify.add_argument("--follow-symlinks", action="store_true")
+    add_packages(verify)
+    verify.add_argument("-v", "--verbose", action="store_true")
 
     diff = sub.add_parser("diff", help="compare a tool catalogue against an approved baseline")
     diff.add_argument("--baseline", required=True, metavar="FILE")
@@ -64,6 +111,16 @@ def build_parser() -> argparse.ArgumentParser:
 
 def _split_ids(s: str | None) -> set[str]:
     return {x.strip().upper() for x in s.split(",") if x.strip()} if s else set()
+
+
+def _package_paths(items: list[str]) -> dict[str, str]:
+    out: dict[str, str] = {}
+    for item in items:
+        name, sep, path = item.partition("=")
+        if not sep or not name.strip() or not path.strip():
+            raise scanner.ScanError(f"--package-path expects SERVER=DIR, got {item!r}")
+        out[name.strip()] = path.strip()
+    return out
 
 
 def _emit_report(report: Report, args: argparse.Namespace) -> None:
@@ -102,6 +159,14 @@ def _exit_for(report: Report, fail_on: str) -> int:
     return EXIT_FINDINGS if any(f.severity.rank >= threshold for f in report.findings) else EXIT_OK
 
 
+def _print_rule_errors(report: Report) -> None:
+    for err in report.errors:
+        print(
+            f"mcp-trustcheck: rule {err['rule_id']} failed on {err['file']}: {err['message']}",
+            file=sys.stderr,
+        )
+
+
 def _cmd_scan(args: argparse.Namespace) -> int:
     opts = scanner.ScanOptions(
         inputs=list(args.paths),
@@ -112,20 +177,56 @@ def _cmd_scan(args: argparse.Namespace) -> int:
         follow_symlinks=args.follow_symlinks,
         max_bytes=args.max_file_size,
         max_files=args.max_files,
+        packages=not args.no_packages,
+        package_paths=_package_paths(args.package_path),
+        lock=args.lock,
     )
     report = scanner.scan(opts)
     _emit_report(report, args)
-    for err in report.errors:
-        print(
-            f"mcp-trustcheck: rule {err['rule_id']} failed on {err['file']}: {err['message']}",
-            file=sys.stderr,
-        )
+    _print_rule_errors(report)
     return _exit_for(report, args.fail_on)
 
 
 def _cmd_diff(args: argparse.Namespace) -> int:
     report = scanner.diff(args.baseline, args.current)
     _emit_report(report, args)
+    return _exit_for(report, args.fail_on)
+
+
+def _cmd_lock(args: argparse.Namespace) -> int:
+    opts = scanner.ScanOptions(
+        inputs=list(args.paths),
+        follow_symlinks=args.follow_symlinks,
+        packages=not args.no_packages,
+        package_paths=_package_paths(args.package_path),
+    )
+    report, lock = scanner.lock(opts)
+    out = Path(args.lock_file)
+    write_lock(out, lock)
+    n = len(lock["servers"])
+    located = sum(1 for e in lock["servers"].values() if e["package"])
+    cats = sum(1 for e in lock["servers"].values() if e["catalogue"])
+    print(
+        f"lock written to {out}: {n} server{'s' if n != 1 else ''}, "
+        f"{located} with package code, {cats} with an approved catalogue."
+    )
+    for u in report.unlocated:
+        print(f"  not located: {u.server} ({u.ecosystem} {u.spec}): {u.reason}", file=sys.stderr)
+    _print_rule_errors(report)
+    return EXIT_OK
+
+
+def _cmd_verify(args: argparse.Namespace) -> int:
+    opts = scanner.ScanOptions(
+        inputs=list(args.paths),
+        follow_symlinks=args.follow_symlinks,
+        packages=not args.no_packages,
+        package_paths=_package_paths(args.package_path),
+        lock=args.lock,
+    )
+    report = scanner.verify(opts)
+    _emit_report(report, args)
+    _print_rule_errors(report)
     return _exit_for(report, args.fail_on)
 
 
@@ -194,6 +295,10 @@ def main(argv: Sequence[str] | None = None) -> int:
             return _cmd_scan(args)
         if args.command == "diff":
             return _cmd_diff(args)
+        if args.command == "lock":
+            return _cmd_lock(args)
+        if args.command == "verify":
+            return _cmd_verify(args)
         return _cmd_rules(args)
     except scanner.ScanError as exc:
         print(f"mcp-trustcheck: {exc}", file=sys.stderr)

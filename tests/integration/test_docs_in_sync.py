@@ -7,7 +7,7 @@ import json
 import sys
 from pathlib import Path
 
-from mcp_trustcheck import rules_catalog
+from mcp_trustcheck import rules_catalog, scanner
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -34,7 +34,7 @@ def test_every_rule_is_documented_and_fixtured() -> None:
     fired = {r.split("@")[0] for k, v in expected.items() if not k.startswith("_") for r in v}
     for rid in rules_catalog.all_rule_ids():
         assert f"### {rid} — " in doc, rid
-        assert rid in fired or rid == "TOOL-006", (
+        assert rid in fired or rid in scanner.LOCK_RULES, (
             f"{rid} has no positive fixture in examples/expected.json"
         )
 

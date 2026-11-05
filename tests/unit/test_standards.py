@@ -44,7 +44,7 @@ def test_findings_and_renderers_carry_all_standards_and_references() -> None:
     assert report.findings
     text = render_terminal(report, colour=False)
     data = json.loads(render_json(report))
-    assert data["schema_version"] == "1.1"
+    assert data["schema_version"] == "1.2"
     for f in report.findings:
         meta = rules_catalog.RULES[f.rule_id]
         assert [s.id for s in f.standards] == [s.id for s in meta.standards]

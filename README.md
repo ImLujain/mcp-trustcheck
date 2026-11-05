@@ -24,7 +24,7 @@ examples/configs/positive/cfg-003-shell-wrapper.json
     ref       MCP Security Best Practices — Local MCP Server Compromise <https://modelcontextprotocol.io/docs/2026-07-28/tutorials/security/security_best_practices#local-mcp-server-compromise>
 ```
 
-> **Status:** 0.1.0, research-grade MVP. 23 checks, 103 tests, zero runtime dependencies, Python ≥ 3.10.
+> **Status:** 0.2.0, research-grade. 27 checks, zero runtime dependencies, Python ≥ 3.10. Since 0.2.0 the tool also reads the *code* of each configured server from the local launcher cache and reports what it can do (see [What the code can do](#what-the-code-can-do)).
 > Findings are static indicators and configuration weaknesses — **not** proof that a server is malicious
 > or that a vulnerability is exploitable. Read [Limitations](#limitations) before relying on a result.
 
@@ -86,9 +86,12 @@ No runtime dependencies. Dev dependencies are `pytest`, `jsonschema`, `ruff`, `m
 
 ```
 mcp-trustcheck scan <path>... [--format terminal|json|both] [--output FILE]
-                              [--baseline FILE] [--fail-on critical|high|medium|low|info|never]
+                              [--baseline FILE] [--lock FILE] [--fail-on critical|high|medium|low|info|never]
                               [--min-confidence high|medium|low] [--rules ID,ID] [--exclude-rules ID,ID]
+                              [--package-path SERVER=DIR] [--no-packages]
                               [--follow-symlinks] [--max-file-size BYTES] [--max-files N] [--no-color] [-v]
+mcp-trustcheck lock <path>... [--lock-file FILE] [--package-path SERVER=DIR] [--no-packages]
+mcp-trustcheck verify <path>... [--lock FILE] [--format ...] [--fail-on ...]
 mcp-trustcheck diff --baseline approved.json current.json
 mcp-trustcheck rules [--explain ID] [--format terminal|json]
 ```
@@ -104,6 +107,14 @@ mcp-trustcheck scan . --format json --output report.json --fail-on medium
 
 # Did the server's tools change since I approved them?  (offline rug-pull check)
 mcp-trustcheck diff --baseline approved-tools.json current-tools.json
+
+# Record what I reviewed — package version, content digest, what the code can do, the catalogue —
+# then, later or in CI, report exactly what changed
+mcp-trustcheck lock ./.mcp.json ./tools-list.json
+mcp-trustcheck verify ./.mcp.json ./tools-list.json --fail-on medium
+
+# The server was installed elsewhere (or I extracted an `npm pack` tarball myself): point at the code
+mcp-trustcheck scan ./.mcp.json --package-path weather=./weather-mcp-1.4.0
 
 # Why does CFG-003 fire, and when is it wrong?
 mcp-trustcheck rules --explain CFG-003
@@ -140,6 +151,9 @@ labels the catalogue for cross-server checks.
 | `CFG-013` | Tool approval bypassed (auto-approve / trust) | T11 | weakness | medium / high | CWE-862, MCP02:2025, LLM06:2025 |
 | `CFG-014` | Duplicate server definitions | T3 | info | low / high | CWE-694, MCP09:2025 |
 | `CFG-015` | Sensitive parameter mirrored into an HTTP header | T9 | weakness | high / high | CWE-200, CWE-522, MCP01:2025, LLM02:2025 |
+| `CFG-018` | Install-time hook in the launched package | T6 | indicator | medium / high | CWE-829, CWE-506, MCP04:2025, LLM03:2025 |
+| `CFG-019` | Launched package can fetch and execute code at runtime | T6 | indicator | medium / medium | CWE-94, CWE-494, MCP04:2025, MCP05:2025 |
+| `CFG-020` | Launched package or its capabilities drifted from the lock | T2 | indicator | high / high | CWE-345, CWE-494, MCP04:2025, MCP03:2025, LLM03:2025 |
 | `TOOL-001` | Agent-directed instructions in tool metadata | T1 | indicator | medium / low | CWE-1427, MCP03:2025, MCP06:2025, LLM01:2025 |
 | `TOOL-002` | Hidden or obfuscated content in tool metadata | T1 | indicator | medium / high | CWE-1427, CWE-506, MCP03:2025, LLM01:2025 |
 | `TOOL-004` | Annotation contradicts apparent capability | T1 | indicator | medium / medium | CWE-451, MCP03:2025, LLM06:2025 |
@@ -148,6 +162,7 @@ labels the catalogue for cross-server checks.
 | `TOOL-007` | Tool name collision or look-alike across servers | T3 | indicator | medium / high | CWE-694, CWE-451, MCP03:2025, MCP09:2025 |
 | `TOOL-008` | Untrusted-content ingress and side-effect tools in one catalogue | T4 | info | info / medium | CWE-1427, CWE-250, MCP06:2025, MCP10:2025, LLM01:2025, LLM06:2025 |
 | `TOOL-009` | Invalid x-mcp-header annotation | T9 | weakness | low / high | CWE-20, MCP01:2025 |
+| `TOOL-012` | Declared behaviour contradicts the handler's code | T1 | weakness | high / medium | CWE-451, CWE-250, MCP03:2025, MCP02:2025, LLM06:2025 |
 
 Threat IDs refer to [`docs/threat-model.md`](docs/threat-model.md). Standards are
 [CWE](https://cwe.mitre.org/) identifiers, the [OWASP MCP Top 10 (2025)](https://owasp.org/www-project-mcp-top-10/)
@@ -169,6 +184,54 @@ A few checks are deliberately **contextual** rather than keyword-based:
   user, pseudo system tags, credential-file references, exfiltration channels, cross-tool
   manipulation) and raises confidence with the number of *distinct* classes, so a verbose but honest
   description does not look like the canonical poisoning payload.
+
+## What the code can do
+
+Every other MCP scanner, and 0.1.0 of this one, judges a server by what it *says*: its launch line
+and its tool descriptions. Those are the two inputs an attacker writes. Since 0.2.0 the scanner also
+reads what the server *is*: the package the launcher would run, which the client has already
+installed on disk.
+
+For each configured server it:
+
+1. **Locates the code, offline.** `npx`/`bunx`/`pnpm dlx` packages in their caches, `uvx`/`pipx`
+   environments, a project `node_modules` or virtualenv, or the script path named in the config.
+   Nothing is fetched; nothing is executed; a package that is not on disk is reported as
+   *not located* with the places that were searched. `--package-path SERVER=DIR` points at code
+   you obtained yourself.
+2. **Derives a capability manifest.** Python is read through the `ast` module; JavaScript and
+   TypeScript through an import-aware lexical pass. The manifest lists every *sink* the code can
+   reach in eight classes — run programs, read / write / delete files, reach the network (with the
+   hosts seen), read environment variables (with their names), load code at runtime, load native
+   code — and any install-time script.
+3. **Attributes sinks to tools.** `@mcp.tool()` and `@server.call_tool()` dispatchers in Python;
+   `server.tool("name", …)`, `case "name":` and `if (name === "name")` ranges in JavaScript; calls
+   are followed through the package's own functions.
+4. **Compares the claim with the code** (`TOOL-012`): a tool annotated `readOnlyHint: true`, or
+   named like a read, whose handler can run programs or delete files is reported with the exact
+   file and line.
+5. **Locks and verifies.** `lock` records version, content digest, capability classes per package
+   and per tool, install hooks and the approved catalogue. `verify` reports a version change, a
+   same-version content change, a new capability class, a new tool, a new hook, a changed launch
+   line, or an unlocked server (`CFG-020`), plus catalogue drift (`TOOL-006`).
+
+The report prints one plain-language line per server before any finding:
+
+```
+Server capabilities  (from package code on disk; a static reading, not a verdict)
+  demo-node  @example/demo-node-server@1.0.0  examples/packages/demo-node-server
+    3 files, javascript, via node script, attribution: lexical
+    can run programs; read files; write files; delete files; reach the network
+      (api.weather.example.invalid); read environment variables (WEATHER_API_KEY)
+    install hooks: postinstall: node scripts/setup.js
+    tools: export_tide_report → fs_delete, fs_read, fs_write; get_tides → env, network;
+      list_tide_reports → exec
+```
+
+What this is not: it is static reachability, not proof of execution, and it sees only the
+package's own Python/JavaScript source. Confidence is reported per finding — High for Python AST
+attribution, Medium for the JavaScript lexical pass, Low for minified bundles — and a handler the
+analyser cannot attribute is never judged. `--no-packages` turns the whole feature off.
 
 ## How findings are graded
 
@@ -262,7 +325,10 @@ snippet that happens to contain it.
 ```
 src/mcp_trustcheck/
   cli.py             argparse, exit codes — no analysis logic
-  scanner.py         discovery → loaders → checks → Report
+  scanner.py         discovery → loaders → package code → checks → Report; lock / verify
+  code/              locate the launched package on disk; Python (ast) and JS/TS (lexical) analysers;
+                     capability manifest and per-tool attribution
+  lock.py            the lock document: version, digest, capabilities, hooks, approved catalogue
   discovery.py       path validation, walking, size/depth/type gating, skip reasons
   loaders/           structural kind detection; mcpServers & VS Code dialects; tool catalogue shapes
   model.py           Severity, Confidence, Kind, ServerConfig, ToolDefinition, Finding, Report
@@ -270,6 +336,7 @@ src/mcp_trustcheck/
   redaction.py       secret patterns, Redactor, control-character sanitisation
   checks/            pure functions (ServerConfig | ToolSet, Context) -> list[Finding]
     config/          CFG-* rules      tools/   TOOL-* rules (+ CFG-015, which reads tool schemas)
+                     package_code.py: CFG-018/019/020     claims.py: TOOL-012
   report/            terminal and JSON renderers
 ```
 
@@ -342,8 +409,10 @@ Documented, not promised:
 
 - **Live drift monitoring** (TOOL-010): connect to a server with explicit authorisation, snapshot
   `tools/list`, re-check on `notifications/tools/list_changed` or `ttlMs` expiry.
-- **Source-level checks** (TOOL-011): taint analysis for argument → shell / CLI-flag sinks in server
-  code, the shape of CVE-2025-53107 and friends.
+- **Source-level taint** (TOOL-011): the capability manifest says a handler *reaches* a shell; taint
+  analysis would say whether a tool *argument* reaches it, the shape of CVE-2025-53107 and friends.
+- **More ecosystems for the manifest**: Go and Rust binaries (symbol tables), container images
+  (layer contents), transitive dependencies.
 - **OAuth proxy patterns** (CFG-017): token passthrough and confused-deputy detection from server
   source or safe probing.
 - **Config file hygiene** (CFG-016): permissions, `.gitignore` coverage.

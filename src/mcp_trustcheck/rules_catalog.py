@@ -51,6 +51,18 @@ REF_OWASP_SECRETS = Reference(
     "OWASP Secrets Management Cheat Sheet",
     "https://cheatsheetseries.owasp.org/cheatsheets/Secrets_Management_Cheat_Sheet.html",
 )
+REF_NPM_SCRIPTS = Reference(
+    "npm Docs — scripts: life cycle scripts run on install",
+    "https://docs.npmjs.com/cli/v10/using-npm/scripts#life-cycle-scripts",
+)
+REF_OWASP_MCP04 = Reference(
+    "OWASP MCP Top 10 (beta) — MCP04 Software Supply Chain Attacks & Dependency Tampering",
+    "https://owasp.org/www-project-mcp-top-10/",
+)
+REF_TOOLS_ANNOTATIONS = Reference(
+    "MCP Tools specification — Tool Annotations (hints, not guarantees)",
+    f"{SPEC}/server/tools#tool-annotations",
+)
 REF_OAUTH21 = Reference(
     "OAuth 2.1 — TLS requirements (§1.5)",
     "https://datatracker.ietf.org/doc/html/draft-ietf-oauth-v2-1-13#section-1.5",
@@ -696,6 +708,115 @@ _add(
         spec_note="MCP 2026-07-28.",
         detection="Empty/non-token names; duplicates (case-insensitive); non-primitive or `number` "
         "types; placement under items/oneOf/anyOf/allOf/not/if/then/else/$ref.",
+    )
+)
+
+# --------------------------------------------------------------------------- package-code rules
+# These read the server's code from a local launcher cache or script path (docs/design.md §8).
+# They never run it and never fetch it.
+
+_add(
+    RuleMeta(
+        id="CFG-018",
+        title="Install-time hook in the launched package",
+        threat="T6",
+        property="Code the package runs happens only when the server runs, not when the launcher "
+        "installs or updates it.",
+        kind=Kind.INDICATOR,
+        severity=Severity.MEDIUM,
+        confidence=Confidence.HIGH,
+        impact="`preinstall`, `install`, `postinstall` and `prepare` scripts execute with the user's "
+        "privileges the moment `npx`/`bunx`/`pnpm dlx` resolves the package — before any tool is "
+        "listed, before any approval prompt, and on every silent update of an unpinned package. "
+        "This is the mechanism behind most published npm supply-chain payloads.",
+        mitigation="Pin the package (CFG-001) and read the hook script before approving. Prefer "
+        "packages without install hooks, or install with `--ignore-scripts` and launch from a local "
+        "checkout.",
+        limitations="Reads `package.json` scripts and a `setup.py` `cmdclass` only; hooks in "
+        "transitive dependencies and in wheels' build backends are not seen. A hook is a signal, "
+        "not a verdict: native-addon builds use them legitimately.",
+        references=(REF_NPM_SCRIPTS, REF_LOCAL_COMPROMISE, REF_OWASP_MCP04),
+        standards=(CWE_829, CWE_506, OWASP_MCP04, OWASP_LLM03),
+        detection="The located package's `package.json` has a `preinstall`/`install`/`postinstall`/"
+        "`prepare` script, or its `setup.py` defines `cmdclass`.",
+    )
+)
+_add(
+    RuleMeta(
+        id="CFG-019",
+        title="Launched package can fetch and execute code at runtime",
+        threat="T6",
+        property="The code that runs is the code that was reviewed: the package does not evaluate "
+        "strings it obtained at runtime.",
+        kind=Kind.INDICATOR,
+        severity=Severity.MEDIUM,
+        confidence=Confidence.MEDIUM,
+        impact="A package that both reaches the network and evaluates code (`eval`, `new Function`, "
+        "`vm.runIn*`, Python `exec`/`eval`, `pickle.loads`) can change behaviour after review "
+        "without any change to its version, catalogue or files on disk.",
+        mitigation="Review every dynamic-evaluation site; prefer packages that do not evaluate "
+        "runtime strings. Lock the package (`mcp-trustcheck lock`) so that at least the on-disk "
+        "code cannot change silently.",
+        limitations="Co-occurrence in one package, not a proven data flow from the network to the "
+        "evaluator. Bundlers and plugin loaders use dynamic imports legitimately; those are "
+        "recorded in the manifest but do not trigger this rule.",
+        references=(REF_LOCAL_COMPROMISE, REF_OWASP_MCP04),
+        standards=(CWE_94, CWE_494, OWASP_MCP04, OWASP_MCP05),
+        detection="Manifest contains a strong `dynamic_code` sink (not a plain `import()`/`require()`"
+        "/`import_module`) and a `network` sink: Medium. Strong dynamic sink alone: Low.",
+    )
+)
+_add(
+    RuleMeta(
+        id="CFG-020",
+        title="Launched package or its capabilities drifted from the lock",
+        threat="T2",
+        property="What the client launches today is what was reviewed when the lock was written: "
+        "same package version and content, no new capability class, no new install hook.",
+        kind=Kind.INDICATOR,
+        severity=Severity.HIGH,
+        confidence=Confidence.HIGH,
+        impact="An unpinned or re-published package can gain the ability to run programs, write "
+        "files or reach new hosts with no change to the config file. Catalogue drift (TOOL-006) "
+        "would miss it when the tool descriptions stay the same.",
+        mitigation="Re-review the package, then re-run `mcp-trustcheck lock` to accept the new "
+        "state. Pin the version in the config (CFG-001).",
+        limitations="Only runs with `--lock`. Compares against the lock's recorded version, content "
+        "digest and capability classes; a change inside an already-present class (a different "
+        "host, a different file) is reported at lower severity as part of the digest change.",
+        references=(REF_CSA, REF_OWASP_MCP04, REF_LOCAL_COMPROMISE),
+        standards=(CWE_345, CWE_494, OWASP_MCP04, OWASP_MCP03, OWASP_LLM03),
+        detection="Per server in the lock: version changed (Medium); same version but content "
+        "digest changed (High); new capability class at package or tool level, or new install "
+        "hook (High); launch line changed, or server absent from the lock (Medium); locked package "
+        "no longer locatable (Low).",
+    )
+)
+_add(
+    RuleMeta(
+        id="TOOL-012",
+        title="Declared behaviour contradicts the handler's code",
+        threat="T1",
+        property="A tool's catalogue entry (annotations, name, description) is consistent with what "
+        "its implementation can do.",
+        kind=Kind.WEAKNESS,
+        severity=Severity.HIGH,
+        confidence=Confidence.MEDIUM,
+        impact="Clients and users decide whether to approve a call from the catalogue entry. A tool "
+        "presented as read-only whose handler can run programs or delete files turns that approval "
+        "into an unreviewed grant; the catalogue text can be worded to pass every keyword scanner.",
+        mitigation="Fix the annotation (`readOnlyHint`/`destructiveHint`) or rename and re-describe "
+        "the tool so that it says what the code does. Treat the tool as side-effecting until then.",
+        limitations="Static reachability, not a proof of execution: the sink may sit behind a "
+        "condition, be dead code, or be reached only with specific arguments. Confidence is High "
+        "for Python (AST attribution), Medium for JavaScript/TypeScript (lexical ranges), and Low "
+        "when the file is minified. Tools whose handler could not be attributed are not judged.",
+        references=(REF_TOOLS_ANNOTATIONS, REF_TOOLS_UI, REF_INVARIANT),
+        standards=(CWE_451, CWE_250, OWASP_MCP03, OWASP_MCP02, OWASP_LLM06),
+        detection="Match catalogue to manifest by server name. `readOnlyHint: true` and the handler "
+        "reaches exec/fs_write/fs_delete: High. Read-looking tool (get/list/read/search/fetch "
+        "vocabulary, no write/exec/delete/send vocabulary) reaching exec or fs_delete: Medium; "
+        "reaching fs_write only: Low.",
     )
 )
 

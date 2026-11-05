@@ -3,8 +3,11 @@
 Layout, in order:
 
 1. A one-line header and a severity count.
-2. A summary table — one row per finding: number, severity, confidence, rule, title, where.
-3. One detail card per finding, in the same order, with a fixed label column and every value
+2. A "Server capabilities" block when package code was read: per server, what the code can do,
+   its install hooks and per-tool capability classes; servers whose code was not found say where
+   the scan looked.
+3. A summary table — one row per finding: number, severity, confidence, rule, title, where.
+4. One detail card per finding, in the same order, with a fixed label column and every value
    word-wrapped to the terminal width with a hanging indent. Standards and references are
    rendered as two-column lists (identifier / title, title / URL).
 
@@ -136,13 +139,60 @@ def render_terminal(report: Report, *, colour: bool, width: int | None = None) -
     )
     if report.baseline:
         out.append(c(_DIM, f"baseline: {_s(report.baseline)}"))
+    if report.lock:
+        out.append(c(_DIM, f"lock: {_s(report.lock)}"))
     if findings:
         by_sev = summary["by_severity"]
         counts = ", ".join(sev(Severity(s), f"{n} {s}") for s, n in by_sev.items() if n)
         out.append(f"{len(findings)} finding{'s' if len(findings) != 1 else ''}: {counts}")
+        mcp_top10 = {k: v for k, v in summary["by_standard"].items() if k.startswith("MCP")}
+        if mcp_top10:
+            out.append(
+                c(_DIM, "OWASP MCP Top 10: " + ", ".join(f"{k} x{v}" for k, v in mcp_top10.items()))
+            )
     else:
         out.append("No findings.")
     out.append("")
+
+    # ---- server capabilities (from package code) -------------------------------------------
+    if report.packages or report.unlocated:
+        out.append(
+            c(_BOLD, "Server capabilities")
+            + c(_DIM, "  (from package code on disk; a static reading, not a verdict)")
+        )
+        out.append(hr)
+        for pkg in report.packages:
+            ver = f"@{pkg.version}" if pkg.version else ""
+            head = f"{_s(pkg.server)}  {c(_DIM, _s(pkg.name) + ver + '  ' + _s(pkg.root))}"
+            out += _wrap(head, width, _INDENT, _INDENT + "  ")
+            meta = (
+                f"{pkg.files_scanned} file{'s' if pkg.files_scanned != 1 else ''}, {pkg.language}, "
+                f"via {pkg.located_by}, attribution: {pkg.attribution}"
+            )
+            out += [c(_DIM, ln) for ln in _wrap(meta, width, _INDENT + "  ", _INDENT + "    ")]
+            out += _wrap(_s(pkg.summary()), width, _INDENT + "  ", _INDENT + "    ")
+            if pkg.install_hooks:
+                hooks = "; ".join(f"{k}: {v}" for k, v in sorted(pkg.install_hooks.items()))
+                out += _wrap(f"install hooks: {_s(hooks)}", width, _INDENT + "  ", _INDENT + "    ")
+            attributed = [t for t in pkg.tools.values() if t.handler]
+            if attributed:
+                parts = []
+                for t in sorted(attributed, key=lambda t: t.name):
+                    cls = ", ".join(sorted(t.classes)) or "no sinks"
+                    parts.append(f"{_s(t.name)} → {cls}")
+                out += _wrap("tools: " + "; ".join(parts), width, _INDENT + "  ", _INDENT + "    ")
+            for note in pkg.notes:
+                out += [
+                    c(_DIM, ln)
+                    for ln in _wrap(f"note: {_s(note)}", width, _INDENT + "  ", _INDENT + "    ")
+                ]
+        for u in report.unlocated:
+            spec = f" {_s(u.spec)}" if u.spec else ""
+            text = f"{_s(u.server)}  {u.ecosystem}{spec}: {_s(u.reason)}"
+            if u.searched:
+                text += " (looked in: " + ", ".join(u.searched) + ")"
+            out += [c(_DIM, ln) for ln in _wrap(text, width, _INDENT, _INDENT + "  ")]
+        out.append("")
 
     # ---- summary table ----------------------------------------------------------------------
     if findings:

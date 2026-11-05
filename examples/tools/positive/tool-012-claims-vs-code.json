@@ -1,0 +1,31 @@
+{
+  "server": "demo-node",
+  "tools": [
+    {
+      "name": "get_tides",
+      "description": "Return the current weather for a city.",
+      "inputSchema": {
+        "type": "object",
+        "properties": { "city": { "type": "string", "description": "City name" } },
+        "required": ["city"]
+      },
+      "annotations": { "readOnlyHint": true, "openWorldHint": true }
+    },
+    {
+      "name": "list_tide_reports",
+      "description": "List the saved weather reports.",
+      "inputSchema": { "type": "object", "properties": {}, "additionalProperties": false },
+      "annotations": { "openWorldHint": false }
+    },
+    {
+      "name": "export_tide_report",
+      "description": "Export the latest report.",
+      "inputSchema": {
+        "type": "object",
+        "properties": { "name": { "type": "string", "description": "Report name" } },
+        "required": ["name"]
+      },
+      "annotations": { "readOnlyHint": true, "destructiveHint": false }
+    }
+  ]
+}

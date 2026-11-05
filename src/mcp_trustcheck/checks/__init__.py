@@ -7,11 +7,14 @@ passes each evidence snippet through the scan's `Redactor` before it is stored.
 
 from __future__ import annotations
 
+import re
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any
 
 from mcp_trustcheck import rules_catalog
+from mcp_trustcheck.code.model import PackageManifest, UnlocatedPackage
 from mcp_trustcheck.model import (
     Affected,
     Confidence,
@@ -35,6 +38,29 @@ class Context:
     baseline_path: str | None = None
     state: dict[str, Any] = field(default_factory=dict)  # scratch space for cross-item checks
     errors: list[CheckError] = field(default_factory=list)
+    # package-code analysis (docs/design.md §8)
+    manifests: dict[str, PackageManifest] = field(default_factory=dict)  # by server name
+    unlocated: list[UnlocatedPackage] = field(default_factory=list)
+    config_dirs: dict[str, Path] = field(default_factory=dict)  # source_file -> directory
+    lock: dict[str, Any] | None = None
+    lock_path: str | None = None
+    baselines: dict[str, ToolSet] = field(default_factory=dict)  # normalised label -> approved
+
+    def manifest_for_label(self, label: str) -> PackageManifest | None:
+        """The manifest whose server name or package name matches a catalogue's server label."""
+        want = norm_label(label)
+        for name, m in self.manifests.items():
+            if norm_label(name) == want:
+                return m
+        for m in self.manifests.values():
+            if norm_label(m.name.rsplit("/", 1)[-1]) == want:
+                return m
+        return None
+
+
+def norm_label(label: str) -> str:
+    """Server labels compared loosely: `demo-node`, `Demo Node` and `demo_node` are one server."""
+    return re.sub(r"[^a-z0-9]", "", label.lower())
 
 
 ConfigCheck = Callable[[ServerConfig, Context], list[Finding]]
@@ -146,12 +172,14 @@ from mcp_trustcheck.checks.config import (  # noqa: E402
     env,
     execution,
     filesystem,
+    package_code,
     packages,
     secrets,
     transport,
 )
 from mcp_trustcheck.checks.tools import (  # noqa: E402
     annotation_hints,
+    claims,
     collisions,
     drift,
     headers,
@@ -167,6 +195,7 @@ __all__ = [
     "Context",
     "annotation_hints",
     "approval",
+    "claims",
     "collisions",
     "container",
     "dangerous",
@@ -180,6 +209,8 @@ __all__ = [
     "hidden",
     "ingress",
     "instructions",
+    "norm_label",
+    "package_code",
     "packages",
     "register",
     "registered_rule_ids",

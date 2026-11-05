@@ -11,6 +11,8 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
 
+from mcp_trustcheck.code.model import PackageManifest, UnlocatedPackage
+
 
 class Severity(str, Enum):
     """Impact *if the finding is true* (threat-model.md §5). Not a score."""
@@ -283,17 +285,23 @@ class Report:
     findings: list[Finding]
     baseline: str | None = None
     errors: list[dict[str, str]] = field(default_factory=list)
-    schema_version: str = "1.1"
+    schema_version: str = "1.2"
+    lock: str | None = None
+    packages: list[PackageManifest] = field(default_factory=list)
+    unlocated: list[UnlocatedPackage] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
         findings = sort_findings(self.findings)
         by_sev = {s.value: 0 for s in Severity}
         by_conf = {c.value: 0 for c in Confidence}
         by_kind = {k.value: 0 for k in Kind}
+        by_std: dict[str, int] = {}
         for f in findings:
             by_sev[f.severity.value] += 1
             by_conf[f.confidence.value] += 1
             by_kind[f.kind.value] += 1
+            for std in f.standards:
+                by_std[std.id] = by_std.get(std.id, 0) + 1
         return {
             "schema_version": self.schema_version,
             "tool": {"name": "mcp-trustcheck", "version": self.tool_version},
@@ -304,6 +312,7 @@ class Report:
                 "files_skipped": [f.to_dict() for f in self.files_skipped],
                 "rules_run": sorted(self.rules_run),
                 "baseline": self.baseline,
+                "lock": self.lock,
                 "errors": list(self.errors),
             },
             "summary": {
@@ -311,6 +320,9 @@ class Report:
                 "by_severity": by_sev,
                 "by_confidence": by_conf,
                 "by_kind": by_kind,
+                "by_standard": dict(sorted(by_std.items())),
             },
+            "packages": [p.to_dict() for p in self.packages]
+            + [u.to_dict() for u in self.unlocated],
             "findings": [f.to_dict() for f in findings],
         }
