@@ -136,7 +136,11 @@ def _evidence(
     for src in sources[:3]:
         s = src.sink
         ev.append((path, f"{s.file}:{s.line} {s.snippet or s.callee}", src.label))
-    for s in net[:2]:
+    seen: set[tuple[str, int]] = set()
+    for s in net:
+        if (s.file, s.line) in seen or len(seen) == 2:
+            continue
+        seen.add((s.file, s.line))
         ev.append(
             (
                 path,
