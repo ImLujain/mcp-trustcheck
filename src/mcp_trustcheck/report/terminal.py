@@ -23,6 +23,7 @@ import shutil
 import sys
 import textwrap
 
+from mcp_trustcheck.code.model import CAPABILITY_CLASSES, PHRASES
 from mcp_trustcheck.model import Finding, Report, Severity, sort_findings
 from mcp_trustcheck.redaction import sanitize_controls
 
@@ -177,8 +178,43 @@ def render_terminal(report: Report, *, colour: bool, width: int | None = None) -
             attributed = [t for t in pkg.tools.values() if t.handler]
             with_sinks = sorted((t for t in attributed if t.classes), key=lambda t: t.name)
             if with_sinks:
-                parts = [f"{_s(t.name)} → {', '.join(sorted(t.classes))}" for t in with_sinks]
+                # tools with the same capability set are one entry: a 60-tool package reads as
+                # "57 tools → env, fs_read, network" plus the few that differ
+                groups: dict[tuple[str, ...], list[str]] = {}
+                for t in with_sinks:
+                    groups.setdefault(tuple(sorted(t.classes)), []).append(_s(t.name))
+                parts = []
+                for key, names in sorted(groups.items(), key=lambda kv: (-len(kv[1]), kv[1][0])):
+                    if len(names) == 1:
+                        parts.append(f"{names[0]} → {', '.join(key)}")
+                    else:
+                        shown = ", ".join(names[:8]) + (
+                            f", +{len(names) - 8} more" if len(names) > 8 else ""
+                        )
+                        parts.append(f"{len(names)} tools → {', '.join(key)} ({shown})")
                 out += _wrap("tools: " + "; ".join(parts), width, _INDENT + "  ", _INDENT + "    ")
+            reached = {cls for t in attributed for cls in t.classes}
+            unreached = [
+                cls for cls in CAPABILITY_CLASSES if cls in pkg.classes and cls not in reached
+            ]
+            if attributed and unreached:
+                # the package can do it, but no tool handler leads there: a CLI, an updater, a
+                # build script. Say where, so the reader can look.
+                locs = []
+                for cls in unreached:
+                    first = min(
+                        (s for s in pkg.sinks if s.cls == cls), key=lambda s: (s.file, s.line)
+                    )
+                    locs.append(f"{PHRASES[cls]} ({_s(first.file)}:{first.line})")
+                out += [
+                    c(_DIM, ln)
+                    for ln in _wrap(
+                        "not reached from any tool: " + "; ".join(locs),
+                        width,
+                        _INDENT + "  ",
+                        _INDENT + "    ",
+                    )
+                ]
             quiet = len(attributed) - len(with_sinks)
             handled = {t.name for t in attributed}
             unattributed = [n for n in pkg.declared_tools if n not in handled]
