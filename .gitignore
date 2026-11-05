@@ -16,3 +16,4 @@ htmlcov/
 /claude_desktop_config.json
 # personal drafts, not part of the project
 /docs/linkedin-post-draft.md
+/docs/linkedin/
