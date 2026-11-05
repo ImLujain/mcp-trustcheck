@@ -29,6 +29,7 @@ class ModuleResult:
     functions: dict[str, FunctionInfo] = field(default_factory=dict)
     sinks: list[Sink] = field(default_factory=list)
     tools: dict[str, str] = field(default_factory=dict)  # tool name -> function key or bare name
+    weak_tools: set[str] = field(default_factory=set)  # names found via a loosely-typed dispatcher
     declared: set[str] = field(default_factory=set)
     notes: list[str] = field(default_factory=list)
     attribution: str = "none"  # "ast" | "lexical" | "none"

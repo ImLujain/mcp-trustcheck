@@ -25,7 +25,8 @@ from mcp_trustcheck.model import ServerConfig
 MAX_FILES = 3000
 MAX_FILE_BYTES = 1024 * 1024
 MAX_TOTAL_BYTES = 40 * 1024 * 1024
-MAX_DEPTH = 6
+MAX_DEPTH = 10
+MAX_CANDIDATES = 6  # same-named functions followed per call when no module hint resolves
 
 PY_SUFFIXES = (".py",)
 JS_SUFFIXES = (".js", ".mjs", ".cjs", ".jsx", ".ts", ".mts", ".cts", ".tsx")
@@ -53,7 +54,9 @@ SKIP_DIRS = frozenset(
 _SKIP_FILE_RE = re.compile(
     r"(?:\.d\.ts|\.map|\.min\.js|\.test\.[cm]?[jt]sx?|\.spec\.[cm]?[jt]sx?)$|^test_.*\.py$|_test\.py$|^conftest\.py$"
 )
-INSTALL_HOOKS = ("preinstall", "install", "postinstall", "prepare")
+# `prepare` is deliberately absent: npm runs it for local checkouts and git dependencies, not when a
+# published tarball is installed from the registry, so it never fires for an `npx pkg` launch.
+INSTALL_HOOKS = ("preinstall", "install", "postinstall")
 
 
 def _iter_files(paths: list[Path], root: Path) -> list[Path]:
@@ -127,14 +130,20 @@ class _Resolver:
         cands = self.by_name.get(ref, [])
         return cands[0] if len(cands) == 1 else (cands[0] if cands else None)
 
-    def targets(self, call: str) -> list[FunctionInfo]:
+    def targets(self, call: str, caller: FunctionInfo | None = None) -> list[FunctionInfo]:
+        if call in self.by_key:  # an exact function key (inline handler inside a tool object)
+            return [self.by_key[call]]
         if "|" in call:
             hint, name = call.split("|", 1)
             hit = self.by_mod.get((hint, name))
             if hit is not None:
                 return [hit]
-            return self.by_name.get(name, [])[:3]
-        return self.by_name.get(call, [])[:3]
+        else:
+            name = call
+        cands = self.by_name.get(name, [])
+        if caller is not None:
+            cands = sorted(cands, key=lambda f: f.file != caller.file)  # same file first
+        return cands[:MAX_CANDIDATES]
 
     def reach(self, start: FunctionInfo) -> tuple[list[Sink], int]:
         seen = {start.key}
@@ -148,7 +157,7 @@ class _Resolver:
             if d >= MAX_DEPTH:
                 continue
             for call in sorted(info.calls):
-                for tgt in self.targets(call):
+                for tgt in self.targets(call, info):
                     if tgt.key not in seen:
                         seen.add(tgt.key)
                         queue.append((tgt, d + 1))
@@ -212,11 +221,12 @@ def analyse(
     resolver = _Resolver(modules)
     sinks: list[Sink] = [s for m in modules for s in m.sinks]
     tools: dict[str, ToolCapabilities] = {}
-    declared: set[str] = set()
+    declared: set[str] = set().union(*(m.declared for m in modules))
     attributions: set[str] = set()
     for m in modules:
-        declared |= m.declared
         for name, ref in m.tools.items():
+            if name in m.weak_tools and name not in declared:
+                continue  # a `switch (metricName)` look-alike, not a tool this package declares
             info = resolver.lookup(ref)
             if info is None:
                 tools.setdefault(name, ToolCapabilities(name=name, handler=""))

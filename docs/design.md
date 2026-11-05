@@ -250,7 +250,7 @@ mismatch is stated in `located_by`.
 A manifest is a list of *sinks* — `(class, file, line, callee, detail)` — in eight classes:
 `exec`, `fs_read`, `fs_write`, `fs_delete`, `network` (detail: host), `env` (detail: variable
 name), `dynamic_code`, `native`. Plus: install hooks (`package.json` `preinstall`/`install`/
-`postinstall`/`prepare`, `setup.py` `cmdclass`), a content digest (SHA-256 over every file read),
+`postinstall`, `setup.py` `cmdclass`), a content digest (SHA-256 over every file read),
 declared tool names and per-tool capabilities.
 
 - **Python** (`code/python.py`): `ast`. Callees are resolved through the module's imports, so
@@ -263,7 +263,7 @@ declared tool names and per-tool capabilities.
   or uses a global (`fetch`, `eval`, `new Function`, `process.env`, `Deno.*`, `Bun.*`). Handlers:
   the argument range of `server.tool("name", …)` / `registerTool`, `case "name":` arms of a
   `switch (name)`, `if (name === "name") {…}` blocks.
-- **Attribution** follows calls through the package's own functions (depth ≤ 6) and is labelled
+- **Attribution** follows calls through the package's own functions (depth ≤ 10) and is labelled
   `ast`, `lexical` or `none`. Minified files are noted and lower the confidence of TOOL-012.
 
 Bounds: 3 000 files, 1 MiB per file, 40 MiB total; `node_modules`, tests, `.d.ts`, source maps and

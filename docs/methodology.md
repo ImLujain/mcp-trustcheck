@@ -413,9 +413,9 @@ Rules implemented: 27 (18 configuration, 9 tool-definition). Rules CFG-018, CFG-
    ```
    "scripts": { "postinstall": "node scripts/setup.js" }
    ```
-4. **Detection logic.** The located package's `package.json` has a `preinstall`/`install`/`postinstall`/`prepare` script, or its `setup.py` defines `cmdclass`.
+4. **Detection logic.** The located package's `package.json` has a `preinstall`/`install`/`postinstall` script, or its `setup.py` defines `cmdclass`. `prepare` is ignored (npm runs it for checkouts and git dependencies, not for registry installs).
 5. **Limitations.**
-   - *False positives:* Native-addon packages that build on install; `prepare` scripts that only run on git installs.
+   - *False positives:* Native-addon packages that build on install. (`prepare` is ignored: npm runs it for checkouts and git dependencies, not for registry installs.)
    - *False negatives:* Hooks in transitive dependencies; build backends of Python wheels; packages whose code could not be located (nothing is reported).
    - Reads `package.json` scripts and a `setup.py` `cmdclass` only; hooks in transitive dependencies and in wheels' build backends are not seen. A hook is a signal, not a verdict: native-addon builds use them legitimately.
 6. **Mitigation.** Pin the package (CFG-001) and read the hook script before approving. Prefer packages without install hooks, or install with `--ignore-scripts` and launch from a local checkout.
@@ -429,7 +429,7 @@ Rules implemented: 27 (18 configuration, 9 tool-definition). Rules CFG-018, CFG-
    - [MCP04:2025](https://owasp.org/www-project-mcp-top-10/) Software Supply Chain Attacks & Dependency Tampering — OWASP MCP Top 10
    - [LLM03:2025](https://genai.owasp.org/llm-top-10/) Supply Chain — OWASP LLM Top 10
 
-*Impact if true:* `preinstall`, `install`, `postinstall` and `prepare` scripts execute with the user's privileges the moment `npx`/`bunx`/`pnpm dlx` resolves the package — before any tool is listed, before any approval prompt, and on every silent update of an unpinned package. This is the mechanism behind most published npm supply-chain payloads.
+*Impact if true:* `preinstall`, `install` and `postinstall` scripts execute with the user's privileges the moment `npx`/`bunx`/`pnpm dlx` resolves the package — before any tool is listed, before any approval prompt, and on every silent update of an unpinned package. This is the mechanism behind most published npm supply-chain payloads.
 
 ### CFG-019 — Launched package can fetch and execute code at runtime
 

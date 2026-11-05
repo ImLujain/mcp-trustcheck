@@ -186,7 +186,131 @@ def test_js_process_env_names_and_dynamic_code() -> None:
     assert dyn == {"new Function", "import()"}
 
 
+def test_js_loose_dispatchers_are_weak_and_bound_handlers_are_calls() -> None:
+    src = """
+export function noiseFloor(metricName, mean) {
+  switch (metricName) {
+    case "cacheHitRate": return 0.02;
+    case "memoryUsage": return 1;
+  }
+}
+if (ToolClass.name === "CacheTools") { register(ToolClass); }
+class PostTools {
+  getHandlerForTool(toolName) {
+    switch (toolName) {
+      case "wp_delete_post":
+        return this.handleDeletePost.bind(this);
+      default:
+        throw new Error("unknown");
+    }
+  }
+  async handleDeletePost(client, params) { return handleDeletePost(client, params); }
+}
+"""
+    res = analyse_javascript("index.js", src)
+    assert {"cacheHitRate", "memoryUsage", "CacheTools", "wp_delete_post"} <= set(res.tools)
+    assert res.weak_tools == {"cacheHitRate", "memoryUsage", "CacheTools"}
+    assert "handleDeletePost" in res.functions[res.tools["wp_delete_post"]].calls
+
+
+def test_js_delegation_logger_tool_calls_and_parameter_objects() -> None:
+    src = """
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+const logger = LoggerFactory.tool("bulk_operations");   // a logger, not a registration
+export class Api {
+  async deletePost(id) { return this.postsOps.deletePost(id); }   // same-name delegation
+}
+export const tool = {
+  name: "wp_delete_post", description: "Delete a post",
+  parameters: [{ name: "id", type: "number", description: "Post id", required: true }],
+};
+async function handleIt({ id }) { return fetch(`https://wp.example.invalid/${id}`); }
+server.tool("wp_delete_post", "Delete", { id: 1 }, handleIt);
+"""
+    res = analyse_javascript("index.js", src)
+    assert "bulk_operations" not in res.tools
+    assert res.declared == {"wp_delete_post"}, "parameter objects are not tool declarations"
+    api = next(f for f in res.functions.values() if f.name == "deletePost")
+    assert "deletePost" in api.calls
+    assert "handleIt" in res.functions[res.tools["wp_delete_post"]].calls
+
+
+def test_js_tool_objects_bind_handlers_and_member_calls_may_be_reserved_words() -> None:
+    src = """
+import fs from "node:fs";
+export class PageTools {
+  getTools() {
+    return [
+      { name: "wp_list_pages", description: "List", parameters: [], handler: this.handleList.bind(this) },
+      { name: "wp_wipe", description: "Wipe", inputSchema: {}, handler: async () => { fs.rmSync("/x"); } },
+    ];
+  }
+  async handleList(client) { return client.delete("pages"); }   // `delete` is a reserved word
+}
+"""
+    res = analyse_javascript("pages.js", src)
+    assert {"wp_list_pages", "wp_wipe"} <= set(res.tools)
+    assert "handleList" in res.functions[res.tools["wp_list_pages"]].calls
+    wipe_calls = res.functions[res.tools["wp_wipe"]].calls
+    assert any(c.startswith("pages.js::handler#") for c in wipe_calls), wipe_calls
+    assert "delete" in next(f for f in res.functions.values() if f.name == "handleList").calls
+
+
 # ----------------------------------------------------------------------------- extraction
+
+
+def test_extract_drops_undeclared_weak_tools_and_follows_bound_method_chains(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "package.json").write_text(
+        json.dumps({"name": "wp-like", "version": "1.0.0", "scripts": {"prepare": "husky"}})
+    )
+    (tmp_path / "defs.js").write_text(
+        'export const deletePostTool = { name: "wp_delete_post", description: "Delete a post", '
+        'inputSchema: { type: "object" } };\n'
+    )
+    (tmp_path / "posts.js").write_text(
+        """
+import { handleDeletePost } from "./handlers.js";
+export class PostTools {
+  getHandlerForTool(toolName) {
+    switch (toolName) {
+      case "wp_delete_post":
+        return this.handleDeletePost.bind(this);
+      default:
+        throw new Error("unknown");
+    }
+  }
+  async handleDeletePost(client, params) { return handleDeletePost(client, params); }
+}
+"""
+    )
+    (tmp_path / "handlers.js").write_text(
+        "export async function handleDeletePost(client, params) {"
+        " return client.deletePost(params.id); }\n"
+    )
+    (tmp_path / "api.js").write_text(
+        """
+export class Client {
+  async request(method, url) { const r = await fetch(url, { method }); return r.json(); }
+  async deletePost(id) { return this.request("DELETE", `${this.base}/posts/${id}`); }
+}
+"""
+    )
+    (tmp_path / "metrics.js").write_text(
+        """
+export function noiseFloor(metricName) {
+  switch (metricName) { case "cacheHitRate": return 0.02; case "memoryUsage": return 1; }
+}
+"""
+    )
+    loc = Located("path", "wp-like", "1.0.0", tmp_path, [tmp_path], "test")
+    m = analyse(_server("wp"), loc)
+    assert m.install_hooks == {}, "prepare never runs for a registry install"
+    assert "cacheHitRate" not in m.tools and "memoryUsage" not in m.tools
+    assert m.declared_tools == ["wp_delete_post"]
+    assert m.tools["wp_delete_post"].classes == {"network"}
+    assert m.tools["wp_delete_post"].depth >= 3
 
 
 def test_extract_fixture_packages_follow_helpers_across_files() -> None:

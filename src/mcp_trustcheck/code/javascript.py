@@ -290,6 +290,8 @@ class _Range:
     name: str
     line: int
     is_tool: bool = False
+    pending_call: str = ""  # a handler identifier passed by reference to the registration
+    from_object: bool = False  # a `{ name, handler }` tool object rather than a registration call
 
 
 class _Source:
@@ -667,11 +669,53 @@ _TOOL_CALL = re.compile(r"\.(?:tool|registerTool|addTool)\s*\(\s*([\"'])")
 _TOOL_OBJ = re.compile(r"\.(?:tool|registerTool|addTool)\s*\(\s*\{")
 _SWITCH = re.compile(r"\bswitch\s*\(([^)]*)\)\s*\{")
 _CASE = re.compile(r"\bcase\s*([\"'])")
-_IF_NAME = re.compile(
-    r"\bif\s*\(\s*(?:[\w$.]*\b(?:name|toolName|tool)\b)\s*===?\s*([\"'])[^)]*\)\s*\{"
+_IF_NAME = re.compile(r"\bif\s*\(\s*([\w$.]+)\s*===?\s*([\"'])[^)]*\)\s*\{")
+# A dispatcher variable that unambiguously carries the MCP tool name.
+_STRONG_VAR = re.compile(
+    r"^(?:toolName|tool_name|tool|(?:[\w$]+\.)*(?:params|request|req|call|args)\.name)$"
 )
+_WEAK_TAIL = ("name", "tool")
 _DECLARED = re.compile(r"\bname\s*:\s*([\"'])")
 _NAME_KEY = re.compile(r"\bname\s*:\s*([\"'])")
+
+
+_ARROW_OR_FN = re.compile(r"=>|\bfunction\b")
+_TRAILING_IDENT = re.compile(r"(?:[\w$]+\.)*([A-Za-z_$][\w$]*)\s*$")
+
+
+def _handler_reference(args: str) -> str | None:
+    """None if the argument list holds nothing callable; "" for an inline function; else the
+    name of the identifier passed last (`server.tool("x", desc, schema, handleX)`)."""
+    if _ARROW_OR_FN.search(args):
+        return ""
+    last = args.rstrip().rstrip(",").rsplit(",", 1)[-1].strip()
+    mt = _TRAILING_IDENT.match(last)
+    if mt and mt.group(0) == last and last not in _KEYWORDS and not last[0].isdigit():
+        return mt.group(1)
+    return None
+
+
+def _dispatch_strength(expr: str, before: str) -> str | None:
+    """How confidently `switch (expr)` / `if (expr === "x")` dispatches on an MCP tool name.
+
+    "strong": the variable is a tool-name idiom (`toolName`, `request.params.name`, or a bare `name`
+    assigned from `params`). "weak": it merely ends in "name"/"tool" (`metricName`, `cls.name`) -
+    kept only when the case label is also a declared tool. None: not a dispatcher at all.
+    """
+    expr = expr.strip()
+    if _STRONG_VAR.match(expr):
+        return "strong"
+    tail = expr.rsplit(".", 1)[-1].lower()
+    if not tail.endswith(_WEAK_TAIL):
+        return None
+    if expr == "name" and (".params" in before or "params.name" in before):
+        return "strong"
+    return "weak"
+
+
+# Reserved words that are nevertheless common method names (`client.delete(url)`, `map.get(k)`).
+# `if (…) {` never carries these, so the keyword filter can let them through.
+_RESERVED_METHOD_NAMES = frozenset({"get", "set", "delete"})
 
 
 def _function_ranges(src: _Source) -> list[_Range]:
@@ -681,7 +725,7 @@ def _function_ranges(src: _Source) -> list[_Range]:
     for rx in _DEF_RES:
         for mt in rx.finditer(m):
             name = mt.group(1)
-            if name in _KEYWORDS:
+            if name in _KEYWORDS and name not in _RESERVED_METHOD_NAMES:
                 continue
             brace = m.find("{", mt.end() - 1 if m[mt.end() - 1 : mt.end()] == "{" else mt.end())
             if brace < 0:
@@ -710,16 +754,27 @@ def _tool_ranges(src: _Source, res: ModuleResult) -> list[_Range]:
     m = src.masked
     out: list[_Range] = []
 
-    def add(name: str, start: int, end: int) -> None:
+    def add(name: str, start: int, end: int, *, weak: bool = False) -> None:
         key = f"{src.file}::tool:{name}"
         out.append(_Range(start, end, key, f"tool:{name}", src.line_of(start), is_tool=True))
         res.tools.setdefault(name, key)
+        if weak:
+            res.weak_tools.add(name)
+        else:
+            res.weak_tools.discard(name)
 
     for mt in _TOOL_CALL.finditer(m):
         name = src.string_at(mt.start(1))
         paren = m.rfind("(", 0, mt.start(1))
-        if name and paren >= 0:
-            add(name, paren, src.match_close(paren))
+        if not name or paren < 0:
+            continue
+        end = src.match_close(paren)
+        handler_ref = _handler_reference(m[paren + 1 : end - 1])
+        if handler_ref is None:
+            continue  # `logger.tool("x")`: a string and nothing callable is not a registration
+        add(name, paren, end)
+        if handler_ref:
+            out[-1].pending_call = handler_ref
     for mt in _TOOL_OBJ.finditer(m):
         paren = m.rfind("(", 0, mt.end())
         brace = mt.end() - 1
@@ -730,7 +785,8 @@ def _tool_ranges(src: _Source, res: ModuleResult) -> list[_Range]:
             if name:
                 add(name, paren, src.match_close(paren))
     for mt in _SWITCH.finditer(m):
-        if "name" not in mt.group(1).lower() and "tool" not in mt.group(1).lower():
+        strength = _dispatch_strength(mt.group(1), m[max(0, mt.start() - 400) : mt.start()])
+        if strength is None:
             continue
         brace = mt.end() - 1
         end = src.match_close(brace)
@@ -740,22 +796,73 @@ def _tool_ranges(src: _Source, res: ModuleResult) -> list[_Range]:
             nxt = cases[i + 1].start() if i + 1 < len(cases) else end
             dflt = re.compile(r"\bdefault\s*:").search(m, cm.end(), nxt)
             if name:
-                add(name, cm.start(), dflt.start() if dflt else nxt)
+                add(name, cm.start(), dflt.start() if dflt else nxt, weak=strength == "weak")
     for mt in _IF_NAME.finditer(m):
-        name = src.string_at(mt.start(1))
+        strength = _dispatch_strength(mt.group(1), m[max(0, mt.start() - 400) : mt.start()])
+        if strength is None:
+            continue
+        name = src.string_at(mt.start(2))
         brace = mt.end() - 1
         if name:
-            add(name, mt.start(), src.match_close(brace))
+            add(name, mt.start(), src.match_close(brace), weak=strength == "weak")
     for mt in _DECLARED.finditer(m):
-        window = m[max(0, mt.start() - 400) : mt.start() + 400]
-        if "description" in window or "inputSchema" in window:
+        start, end, keys = _enclosing_object(src, mt.start())
+        if "name" in keys and keys & _TOOL_SHAPE_KEYS and not keys & _PARAM_SHAPE_KEYS:
             name = src.string_at(mt.start(1))
             if name and " " not in name:
                 res.declared.add(name)
+                if keys & _HANDLER_KEYS and name not in res.tools:
+                    # the object binds the handler itself: `this.h.bind(this)` and any inline
+                    # function inside the object belong to the tool
+                    add(name, start, end)
+                    out[-1].from_object = True
     return out
 
 
+_TOOL_SHAPE_KEYS = frozenset({"inputSchema", "input_schema", "parameters", "handler", "execute"})
+_HANDLER_KEYS = frozenset({"handler", "execute"})
+_PARAM_SHAPE_KEYS = frozenset(
+    {"required", "enum", "default"}
+)  # {name, type, description, required}
+_KEY_RE = re.compile(r"(?<![\w$?.])([A-Za-z_$][\w$]*)\s*:(?!:)")
+
+
+def _enclosing_object(src: _Source, pos: int, limit: int = 4000) -> tuple[int, int, frozenset[str]]:
+    """(start, end, top-level keys) of the object literal containing `pos`; keys empty if none."""
+    m = src.masked
+    depth = 0
+    i = pos - 1
+    stop = max(0, pos - limit)
+    while i >= stop:
+        ch = m[i]
+        if ch == "}":
+            depth += 1
+        elif ch == "{":
+            if depth == 0:
+                break
+            depth -= 1
+        i -= 1
+    else:
+        return -1, -1, frozenset()
+    if i < stop:
+        return -1, -1, frozenset()
+    end = src.match_close(i)
+    body = m[i + 1 : min(end, i + 1 + limit)]
+    keys: set[str] = set()
+    level = 0
+    last = 0
+    for km in _KEY_RE.finditer(body):
+        seg = body[last : km.start()]
+        level += sum(seg.count(c) for c in "{[(") - sum(seg.count(c) for c in "}])")
+        last = km.start()
+        if level == 0:
+            keys.add(km.group(1))
+    return i, end, frozenset(keys)
+
+
 _CALL_RE = re.compile(r"(?<![\w$])\.?([A-Za-z_$][\w$]*)\s*\(")
+# `this.handler.bind(this)` / `fn.call(...)`: a reference handed on as a callable counts as a call.
+_BIND_RE = re.compile(r"(?<![\w$])([A-Za-z_$][\w$]*)\s*\.\s*(?:bind|call|apply)\s*\(")
 
 
 def analyse_javascript(file: str, text: str) -> ModuleResult:
@@ -773,9 +880,17 @@ def analyse_javascript(file: str, text: str) -> ModuleResult:
 
     ranges = _function_ranges(src) + _tool_ranges(src, res)
     for r in ranges:
-        res.functions.setdefault(
+        info = res.functions.setdefault(
             r.key, FunctionInfo(key=r.key, name=r.name, file=file, line=r.line)
         )
+        if r.pending_call:
+            info.calls.add(r.pending_call)
+    for r in ranges:
+        if not r.from_object:
+            continue
+        for fn in ranges:
+            if fn.name in _HANDLER_KEYS and r.start < fn.start < r.end and not fn.is_tool:
+                res.functions[r.key].calls.add(fn.key)  # by key, never confused with other handlers
 
     def innermost(pos: int) -> _Range | None:
         best: _Range | None = None
@@ -794,7 +909,17 @@ def analyse_javascript(file: str, text: str) -> ModuleResult:
     # calls -> enclosing function
     for mt in _CALL_RE.finditer(src.masked):
         name = mt.group(1)
-        if name in _KEYWORDS:
+        member = mt.group(0).startswith(".") or src.masked[mt.start() - 1 : mt.start()] == "."
+        if name in _KEYWORDS and not member:  # `client.delete(...)` is a call, `delete x` is not
+            continue
+        caller = innermost(mt.start())
+        if caller is None:
+            continue
+        if caller.name != name or member:  # `deletePost() { return this.ops.deletePost() }`
+            res.functions[caller.key].calls.add(name)
+    for mt in _BIND_RE.finditer(src.masked):
+        name = mt.group(1)
+        if name in _KEYWORDS or name == "this":
             continue
         caller = innermost(mt.start())
         if caller is not None and caller.name != name:

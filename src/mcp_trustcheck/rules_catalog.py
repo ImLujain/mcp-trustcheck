@@ -725,7 +725,7 @@ _add(
         kind=Kind.INDICATOR,
         severity=Severity.MEDIUM,
         confidence=Confidence.HIGH,
-        impact="`preinstall`, `install`, `postinstall` and `prepare` scripts execute with the user's "
+        impact="`preinstall`, `install` and `postinstall` scripts execute with the user's "
         "privileges the moment `npx`/`bunx`/`pnpm dlx` resolves the package — before any tool is "
         "listed, before any approval prompt, and on every silent update of an unpinned package. "
         "This is the mechanism behind most published npm supply-chain payloads.",
@@ -737,8 +737,9 @@ _add(
         "not a verdict: native-addon builds use them legitimately.",
         references=(REF_NPM_SCRIPTS, REF_LOCAL_COMPROMISE, REF_OWASP_MCP04),
         standards=(CWE_829, CWE_506, OWASP_MCP04, OWASP_LLM03),
-        detection="The located package's `package.json` has a `preinstall`/`install`/`postinstall`/"
-        "`prepare` script, or its `setup.py` defines `cmdclass`.",
+        detection="The located package's `package.json` has a `preinstall`/`install`/`postinstall` "
+        "script, or its `setup.py` defines `cmdclass`. `prepare` is ignored (npm runs it for "
+        "checkouts and git dependencies, not for registry installs).",
     )
 )
 _add(

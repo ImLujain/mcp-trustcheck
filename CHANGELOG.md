@@ -9,6 +9,22 @@ The scanner now reads the *code* of each configured server, not only what the se
 itself. Everything stays offline and read-only: the code is taken from the local launcher cache or
 script path the client already uses, never fetched, never executed.
 
+### Notes from the first run on a real configuration
+Scanning a config that launches `mcp-wordpress@4.2.4` (105 files) exposed four weaknesses in the
+JavaScript pass, all fixed before release: `prepare` was reported as an install hook although npm
+never runs it for registry installs (CFG-018 now ignores it); `switch (metricName)` and
+`cls.name === "..."` look-alikes were taken for tool dispatchers (now kept only when the label is
+also a declared tool); a method delegating to a same-named method (`deletePost() { return
+this.ops.deletePost() }`) was dropped as recursion, which silently cut most call chains; and
+`logger.tool("x")` was taken for a registration. Three more gaps closed in the same pass: tool
+objects that bind their own handler (`{ name, description, inputSchema, handler: this.h.bind(this) }`
+or an inline function) are now attributed; methods and member calls named with reserved words
+(`client.delete(url)`, `map.get(k)`) are no longer dropped; up to six same-named candidates are
+followed per call, nearest file first, to a depth of ten. Parameter objects (`{name, type,
+description, required}`) no longer count as declared tools, and the terminal report lists only
+tools that reach a sink, with one line counting the rest. On that package the per-tool line went
+from 39 names with "no sinks" (several not tools at all) to 60-odd real tools with their classes.
+
 ### Added
 - **Capability manifests** (`src/mcp_trustcheck/code/`): per server, the package is located on disk
   (`npx`/`bunx`/`pnpm dlx` caches, `uvx`/`pipx` environments, project `node_modules`/virtualenvs, or

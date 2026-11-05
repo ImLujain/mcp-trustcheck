@@ -175,12 +175,32 @@ def render_terminal(report: Report, *, colour: bool, width: int | None = None) -
                 hooks = "; ".join(f"{k}: {v}" for k, v in sorted(pkg.install_hooks.items()))
                 out += _wrap(f"install hooks: {_s(hooks)}", width, _INDENT + "  ", _INDENT + "    ")
             attributed = [t for t in pkg.tools.values() if t.handler]
-            if attributed:
-                parts = []
-                for t in sorted(attributed, key=lambda t: t.name):
-                    cls = ", ".join(sorted(t.classes)) or "no sinks"
-                    parts.append(f"{_s(t.name)} → {cls}")
+            with_sinks = sorted((t for t in attributed if t.classes), key=lambda t: t.name)
+            if with_sinks:
+                parts = [f"{_s(t.name)} → {', '.join(sorted(t.classes))}" for t in with_sinks]
                 out += _wrap("tools: " + "; ".join(parts), width, _INDENT + "  ", _INDENT + "    ")
+            quiet = len(attributed) - len(with_sinks)
+            handled = {t.name for t in attributed}
+            unattributed = [n for n in pkg.declared_tools if n not in handled]
+            tail = []
+            if quiet:
+                tail.append(f"{quiet} attributed tool{'s' if quiet != 1 else ''} reach no sinks")
+            if unattributed:
+                n = len(unattributed)
+                tail.append(
+                    f"{n} declared tool{'s' if n != 1 else ''} not attributed to a handler"
+                    + (
+                        " ("
+                        + ", ".join(_s(x) for x in unattributed[:4])
+                        + (", …" if n > 4 else "")
+                        + ")"
+                    )
+                )
+            if tail:
+                out += [
+                    c(_DIM, ln)
+                    for ln in _wrap("; ".join(tail), width, _INDENT + "  ", _INDENT + "    ")
+                ]
             for note in pkg.notes:
                 out += [
                     c(_DIM, ln)

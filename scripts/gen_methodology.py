@@ -207,7 +207,7 @@ NOTES: dict[str, Notes] = {
         "The client launches the server through a registry launcher (`npx -y`, `bunx`, `pnpm dlx`); the package declares an install-time script, which runs with the user's privileges on first use and on every update of an unpinned package, before any tool is listed or approved.",
         "examples/configs/positive/cfg-018-package-code.json (server `demo-node`, code in examples/packages/demo-node-server)",
         '"scripts": { "postinstall": "node scripts/setup.js" }',
-        "Native-addon packages that build on install; `prepare` scripts that only run on git installs.",
+        "Native-addon packages that build on install. (`prepare` is ignored: npm runs it for checkouts and git dependencies, not for registry installs.)",
         "Hooks in transitive dependencies; build backends of Python wheels; packages whose code could not be located (nothing is reported).",
     ),
     "CFG-019": Notes(
