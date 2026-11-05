@@ -51,7 +51,7 @@ Server capabilities  (from package code on disk; a static reading, not a verdict
              https://modelcontextprotocol.io/docs/2026-07-28/tutorials/security/security_best_practices#local-mcp-server-compromise
 ```
 
-> **Status:** 0.2.0, research-grade. 27 checks, zero runtime dependencies, Python ≥ 3.10. Since 0.2.0 the tool also reads the *code* of each configured server from the local launcher cache and reports what it can do (see [What the code can do](#what-the-code-can-do)).
+> **Status:** 0.2.0, research-grade. 28 checks, zero runtime dependencies, Python ≥ 3.10. Since 0.2.0 the tool also reads the *code* of each configured server from the local launcher cache and reports what it can do (see [What the code can do](#what-the-code-can-do)).
 > Findings are static indicators and configuration weaknesses — **not** proof that a server is malicious
 > or that a vulnerability is exploitable. Read [Limitations](#limitations) before relying on a result.
 
@@ -181,6 +181,7 @@ labels the catalogue for cross-server checks.
 | `CFG-018` | Install-time hook in the launched package | T6 | indicator | medium / high | CWE-829, CWE-506, MCP04:2025, LLM03:2025 |
 | `CFG-019` | Launched package can fetch and execute code at runtime | T6 | indicator | medium / medium | CWE-94, CWE-494, MCP04:2025, MCP05:2025 |
 | `CFG-020` | Launched package or its capabilities drifted from the lock | T2 | indicator | high / high | CWE-345, CWE-494, MCP04:2025, MCP03:2025, LLM03:2025 |
+| `CFG-021` | Tool handler can read credentials and reach the network | T9 | indicator | high / medium | CWE-200, CWE-522, CWE-506, MCP01:2025, MCP03:2025, LLM02:2025 |
 | `TOOL-001` | Agent-directed instructions in tool metadata | T1 | indicator | medium / low | CWE-1427, MCP03:2025, MCP06:2025, LLM01:2025 |
 | `TOOL-002` | Hidden or obfuscated content in tool metadata | T1 | indicator | medium / high | CWE-1427, CWE-506, MCP03:2025, LLM01:2025 |
 | `TOOL-004` | Annotation contradicts apparent capability | T1 | indicator | medium / medium | CWE-451, MCP03:2025, LLM06:2025 |
@@ -237,7 +238,11 @@ For each configured server it:
 4. **Compares the claim with the code** (`TOOL-012`): a tool annotated `readOnlyHint: true`, or
    named like a read, whose handler can run programs or delete files is reported with the exact
    file and line.
-5. **Locks and verifies.** `lock` records version, content digest, capability classes per package
+5. **Looks for the shape of exfiltration** (`CFG-021`): a handler that reads a credential store
+   (`~/.ssh`, `~/.aws/credentials`, another client's MCP config, browser login data) and can reach
+   the network, or that reads a third-party secret such as `GITHUB_TOKEN` and talks to a host that
+   service does not own. A weather server reading its own API key is not reported.
+6. **Locks and verifies.** `lock` records version, content digest, capability classes per package
    and per tool, install hooks and the approved catalogue. `verify` reports a version change, a
    same-version content change, a new capability class, a new tool, a new hook, a changed launch
    line, or an unlocked server (`CFG-020`), plus catalogue drift (`TOOL-006`).
@@ -363,7 +368,7 @@ src/mcp_trustcheck/
   redaction.py       secret patterns, Redactor, control-character sanitisation
   checks/            pure functions (ServerConfig | ToolSet, Context) -> list[Finding]
     config/          CFG-* rules      tools/   TOOL-* rules (+ CFG-015, which reads tool schemas)
-                     package_code.py: CFG-018/019/020     claims.py: TOOL-012
+                     package_code.py: CFG-018/019/020   exfiltration.py: CFG-021   claims.py: TOOL-012
   report/            terminal and JSON renderers
 ```
 

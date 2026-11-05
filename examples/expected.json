@@ -110,7 +110,9 @@
   ],
   "configs/positive/cfg-018-package-code.json": [
     "CFG-018@medium",
-    "CFG-019@medium"
+    "CFG-019@medium",
+    "CFG-021@high",
+    "CFG-021@high"
   ],
   "tools/negative/clean-weather-tools.json": [
     "TOOL-008@info"

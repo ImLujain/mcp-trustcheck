@@ -69,7 +69,9 @@ and in every report footer, because a security tool that overstates its reach is
 
 - **Reachability, not execution.** A sink listed for a tool is reachable from its handler in the
   package's own source. It may be behind a condition the tool never takes, in dead code, or in a
-  shared helper. TOOL-012 reports a *contradiction between claim and code*, not an exploit.
+  shared helper. TOOL-012 reports a *contradiction between claim and code*, not an exploit;
+  CFG-021 reports the *shape* of an exfiltration (credential read plus network reach in one
+  handler), not a proven data flow, and only for credential paths and secret names it knows.
 - **Only the package's own Python and JavaScript/TypeScript.** Side effects performed by a
   subprocess, a native addon, a transitive dependency or a remote service are not seen. Go, Rust and
   container images are reported as *not located*.

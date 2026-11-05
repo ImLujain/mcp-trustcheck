@@ -273,7 +273,8 @@ and the scan's `Redactor` before they are stored.
 ### 8.4 Rules
 
 `CFG-018` install hook, `CFG-019` runtime code loading, `CFG-020` drift against the lock,
-`TOOL-012` catalogue claim versus handler code. Catalogues are matched to manifests by normalised
+`CFG-021` credential source and network egress in one handler, `TOOL-012` catalogue claim versus
+handler code. Catalogues are matched to manifests by normalised
 server label (`demo-node` ≡ `Demo Node` ≡ `demo_node`) or by the package's last name segment.
 
 ### 8.5 Lock (`lock.py`)

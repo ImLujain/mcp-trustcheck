@@ -26,6 +26,13 @@ tools that reach a sink, with one line counting the rest. On that package the pe
 from 39 names with "no sinks" (several not tools at all) to 60-odd real tools with their classes.
 
 ### Added
+- **CFG-021, credential source and network egress in one tool handler.** A handler that reads a
+  credential store (`~/.ssh`, `~/.aws/credentials`, `.netrc`, browser login data, another MCP
+  client's config, …) and can reach the network is reported High with both file:line locations; a
+  handler that reads a known third-party secret (`GITHUB_TOKEN`, `AWS_SECRET_ACCESS_KEY`, …) and
+  talks to a host that service does not own is reported Medium. A server reading its own API key
+  for its own API is not reported. The rule is an indicator: it names the shape of an exfiltration,
+  not intent.
 - **Capability manifests** (`src/mcp_trustcheck/code/`): per server, the package is located on disk
   (`npx`/`bunx`/`pnpm dlx` caches, `uvx`/`pipx` environments, project `node_modules`/virtualenvs, or
   the script path in the config; `--package-path SERVER=DIR` for code you obtained yourself) and
