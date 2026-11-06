@@ -7,6 +7,7 @@ never a claim that the behaviour is malicious.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -44,6 +45,25 @@ WEAK_DYNAMIC_CALLEES = frozenset(
 
 SNIPPET_MAX = 200
 
+# Paths whose only sensible reader is the owner's own tooling: SSH and cloud credentials, package
+# registry tokens, other MCP clients' configs, browser login stores, wallets. Matched against a
+# file-read sink's literal argument when the analyser captured one, otherwise its source line.
+# Shared by the capability report (which lists every such read) and CFG-021 (which judges them).
+CREDENTIAL_PATH_RE = re.compile(
+    r"(?ix)"
+    r"(?:^|[/\\\s\"'`$])(?:"
+    r"\.ssh[/\\]|id_(?:rsa|dsa|ecdsa|ed25519)\b|known_hosts\b"
+    r"|\.aws[/\\](?:credentials|config)\b|\.azure[/\\]|\.config[/\\]gcloud[/\\]"
+    r"|\.kube[/\\]config\b|\.docker[/\\]config\.json\b"
+    r"|\.netrc\b|_netrc\b|\.npmrc\b|\.pypirc\b|\.git-credentials\b|\.gnupg[/\\]"
+    r"|\.config[/\\]gh[/\\]hosts\.yml\b|\.terraform\.d[/\\]credentials"
+    r"|\.claude\.json\b|claude_desktop_config\.json\b|\.cursor[/\\]mcp\.json\b|\.codeium[/\\]"
+    r"|Library[/\\]Keychains[/\\]|Login\s?Data\b|Cookies\b|Local\s?State\b|logins\.json\b|key4\.db\b"
+    r"|\.bash_history\b|\.zsh_history\b|/etc/shadow\b"
+    r"|\.wallet\b|wallet\.dat\b|\.bitcoin[/\\]|\.electrum[/\\]"
+    r")"
+)
+
 
 @dataclass(frozen=True)
 class Sink:
@@ -68,6 +88,26 @@ class Sink:
         if self.snippet:
             d["snippet"] = self.snippet
         return d
+
+
+_QUOTED_RE = re.compile(r"[\"'`]([^\"'`]{1,200})[\"'`]")
+
+
+def credential_path(sink: Sink) -> str | None:
+    """The credential-store path a `fs_read` sink touches, or None."""
+    if sink.cls != "fs_read":
+        return None
+    if sink.detail and CREDENTIAL_PATH_RE.search(sink.detail):
+        return sink.detail
+    text = sink.snippet or ""
+    m = CREDENTIAL_PATH_RE.search(text)
+    if not m:
+        return None
+    # prefer the whole quoted string the match sits in: "~/.ssh/id_ed25519" rather than ".ssh"
+    for q in _QUOTED_RE.finditer(text):
+        if q.start() <= m.start() < q.end():
+            return q.group(1)
+    return m.group(0).strip(" \"'`$/")
 
 
 @dataclass
@@ -128,6 +168,17 @@ class PackageManifest:
     def env_names(self) -> list[str]:
         return self.details("env")
 
+    def credential_reads(self) -> list[tuple[str, Sink]]:
+        """Every file read of a credential store, with the path it names, in source order."""
+        out: list[tuple[str, Sink]] = []
+        seen: set[tuple[str, int]] = set()
+        for s in sorted(self.sinks, key=lambda s: (s.file, s.line)):
+            p = credential_path(s)
+            if p and (s.file, s.line) not in seen:
+                seen.add((s.file, s.line))
+                out.append((p, s))
+        return out
+
     def redact(self, redactor: Redactor) -> None:
         """Scrub every value the scan classified as sensitive out of snippets and details."""
 
@@ -185,6 +236,9 @@ class PackageManifest:
             "tools": [self.tools[k].to_dict() for k in sorted(self.tools)],
             "declared_tools": sorted(self.declared_tools),
             "install_hooks": dict(sorted(self.install_hooks.items())),
+            "credential_reads": [
+                {"path": p, "file": s.file, "line": s.line} for p, s in self.credential_reads()
+            ],
             "notes": list(self.notes),
         }
 

@@ -26,6 +26,10 @@ tools that reach a sink, with one line counting the rest. On that package the pe
 from 39 names with "no sinks" (several not tools at all) to 60-odd real tools with their classes.
 
 ### Added
+- **Credential-store reads in the capability report.** The *Server capabilities* block lists every
+  file read of a credential store (`~/.ssh`, `~/.aws/credentials`, `.netrc`, another MCP client's
+  config, …) with file and line, whether or not CFG-021 fires on it; the JSON report carries the
+  same list as `credential_reads` per package.
 - **CFG-021, credential source and network egress in one tool handler.** A handler that reads a
   credential store (`~/.ssh`, `~/.aws/credentials`, `.netrc`, browser login data, another MCP
   client's config, …) and can reach the network is reported High with both file:line locations; a

@@ -24,6 +24,7 @@ Server capabilities  (from package code on disk; a static reading, not a verdict
       (api.weather.example.invalid, telemetry.example.invalid); read environment variables
       (WEATHER_API_KEY)
     install hooks: postinstall: node scripts/setup.js
+    credential stores read: ${homedir()}/.aws/credentials (index.js:44)
     tools: export_tide_report → fs_delete, fs_read, fs_write; get_tides → env, network;
       list_tide_reports → exec; sync_settings → fs_read, network
   filesystem  npm @modelcontextprotocol/server-filesystem@2026.1.0: package not installed in any
@@ -258,6 +259,7 @@ Server capabilities  (from package code on disk; a static reading, not a verdict
       (api.weather.example.invalid, telemetry.example.invalid); read environment variables
       (WEATHER_API_KEY)
     install hooks: postinstall: node scripts/setup.js
+    credential stores read: ${homedir()}/.aws/credentials (index.js:44)
     tools: export_tide_report → fs_delete, fs_read, fs_write; get_tides → env, network;
       list_tide_reports → exec; sync_settings → fs_read, network
 ```

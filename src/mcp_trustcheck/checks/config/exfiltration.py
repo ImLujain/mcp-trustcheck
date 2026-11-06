@@ -19,25 +19,8 @@ import re
 from dataclasses import dataclass
 
 from mcp_trustcheck.checks import Context, emit, register
-from mcp_trustcheck.code.model import PHRASES, PackageManifest, Sink
+from mcp_trustcheck.code.model import PHRASES, PackageManifest, Sink, credential_path
 from mcp_trustcheck.model import Affected, Confidence, Finding, ServerConfig, Severity
-
-# Paths whose only sensible reader is the owner's own tooling. Matched against the sink's literal
-# argument when the analyser captured one, otherwise against the source line.
-CREDENTIAL_PATH_RE = re.compile(
-    r"(?ix)"
-    r"(?:^|[/\\\s\"'`$])(?:"
-    r"\.ssh[/\\]|id_(?:rsa|dsa|ecdsa|ed25519)\b|known_hosts\b"
-    r"|\.aws[/\\](?:credentials|config)\b|\.azure[/\\]|\.config[/\\]gcloud[/\\]"
-    r"|\.kube[/\\]config\b|\.docker[/\\]config\.json\b"
-    r"|\.netrc\b|_netrc\b|\.npmrc\b|\.pypirc\b|\.git-credentials\b|\.gnupg[/\\]"
-    r"|\.config[/\\]gh[/\\]hosts\.yml\b|\.terraform\.d[/\\]credentials"
-    r"|\.claude\.json\b|claude_desktop_config\.json\b|\.cursor[/\\]mcp\.json\b|\.codeium[/\\]"
-    r"|Library[/\\]Keychains[/\\]|Login\s?Data\b|Cookies\b|Local\s?State\b|logins\.json\b|key4\.db\b"
-    r"|\.bash_history\b|\.zsh_history\b|/etc/shadow\b"
-    r"|\.wallet\b|wallet\.dat\b|\.bitcoin[/\\]|\.electrum[/\\]"
-    r")"
-)
 
 # Environment variables that belong to a named third-party service, with the host suffixes that
 # service controls. A handler that reads one and talks only to those hosts is doing its job.
@@ -93,10 +76,8 @@ def _sources(sinks: list[Sink]) -> list[_Source]:
     out: list[_Source] = []
     for s in sinks:
         if s.cls == "fs_read":
-            text = s.detail or s.snippet
-            m = CREDENTIAL_PATH_RE.search(text or "")
-            if m:
-                shown = s.detail or m.group(0).strip(" \"'`$/")
+            shown = credential_path(s)
+            if shown:
                 out.append(_Source(s, True, f"credential file ({shown})"))
         elif s.cls == "env" and s.detail:
             name = s.detail.upper()

@@ -175,6 +175,15 @@ def render_terminal(report: Report, *, colour: bool, width: int | None = None) -
             if pkg.install_hooks:
                 hooks = "; ".join(f"{k}: {v}" for k, v in sorted(pkg.install_hooks.items()))
                 out += _wrap(f"install hooks: {_s(hooks)}", width, _INDENT + "  ", _INDENT + "    ")
+            creds = pkg.credential_reads()
+            if creds:
+                # a read of ~/.ssh or ~/.aws is worth a line even when no rule fires on it
+                items = "; ".join(f"{_s(p)} ({_s(s.file)}:{s.line})" for p, s in creds[:4]) + (
+                    f"; +{len(creds) - 4} more" if len(creds) > 4 else ""
+                )
+                out += _wrap(
+                    f"credential stores read: {items}", width, _INDENT + "  ", _INDENT + "    "
+                )
             attributed = [t for t in pkg.tools.values() if t.handler]
             with_sinks = sorted((t for t in attributed if t.classes), key=lambda t: t.name)
             if with_sinks:
