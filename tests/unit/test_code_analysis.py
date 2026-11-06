@@ -324,6 +324,9 @@ def test_extract_fixture_packages_follow_helpers_across_files() -> None:
     assert m.hosts == ["api.weather.example.invalid", "telemetry.example.invalid"]
     assert m.env_names == ["WEATHER_API_KEY"]
     assert m.tools["sync_settings"].classes == {"fs_read", "network"}
+    assert [(p, s.file, s.line) for p, s in m.credential_reads()] == [
+        ("${homedir()}/.aws/credentials", "index.js", 44)
+    ]
     assert "run programs" in m.summary() and "delete files" in m.summary()
     assert len(m.digest) == 64
 
@@ -332,6 +335,7 @@ def test_extract_fixture_packages_follow_helpers_across_files() -> None:
     assert m.attribution == "ast"
     assert m.tools["apply_patch"].classes == {"dynamic_code", "network"}
     assert m.tools["read_notes"].classes == {"exec"}
+    assert [p for p, _ in m.credential_reads()] == ["~/.ssh/id_ed25519"]
 
 
 def test_extract_respects_limits_and_skips_tests_and_node_modules(tmp_path: Path) -> None:
@@ -625,6 +629,11 @@ def test_scan_reports_packages_in_both_renderers_and_no_packages_disables() -> N
             and "can run programs" in text
             and "OWASP MCP Top 10" in text
         )
+        assert "credential stores read: ${homedir()}/.aws/credentials (index.js:44)" in text
+        node = next(p for p in data["packages"] if p["server"] == "demo-node")
+        assert node["credential_reads"] == [
+            {"path": "${homedir()}/.aws/credentials", "file": "index.js", "line": 44}
+        ]
         off = scanner.scan(scanner.ScanOptions(inputs=[cfg], packages=False))
         assert off.packages == [] and not [
             f for f in off.findings if f.rule_id in ("CFG-018", "CFG-019")

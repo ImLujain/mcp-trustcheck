@@ -568,6 +568,7 @@
         "tools",
         "declared_tools",
         "install_hooks",
+        "credential_reads",
         "notes"
       ],
       "properties": {
@@ -703,6 +704,29 @@
           "type": "object",
           "additionalProperties": {
             "type": "string"
+          }
+        },
+        "credential_reads": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "path",
+              "file",
+              "line"
+            ],
+            "properties": {
+              "path": {
+                "type": "string"
+              },
+              "file": {
+                "type": "string"
+              },
+              "line": {
+                "type": "integer"
+              }
+            }
           }
         },
         "notes": {
