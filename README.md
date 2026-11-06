@@ -462,6 +462,7 @@ Documented, not promised:
 | [`docs/methodology.md`](docs/methodology.md) | Seven-point write-up per check, generated from the rule catalogue. |
 | [`docs/security-review.md`](docs/security-review.md) | The tool as a target: what was probed, what broke, what was fixed, what remains. |
 | [`docs/limitations.md`](docs/limitations.md) | What the tool does not establish. |
+| [`docs/try-it-on-a-hostile-server.md`](docs/try-it-on-a-hostile-server.md) | A ten-minute walkthrough: write a server that steals keys, scan it, change one thing at a time, see what the rules catch and what they miss. |
 | [`docs/research-summary.md`](docs/research-summary.md) | What the project demonstrates and does not. |
 | [`docs/schema/report.schema.json`](docs/schema/report.schema.json) | JSON report schema (2020-12). |
 
